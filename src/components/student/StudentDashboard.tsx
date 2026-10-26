@@ -59,7 +59,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
 
   // Student data
   const studentProfile = storage.getStudentProfile(studentId);
-  const linkingCode = studentProfile?.linkingCode || 'YD-LK-1001';
+  const linkingCode = studentProfile?.linkingCode || '';
 
   const groups = storage.getGroupsForStudent(studentId);
   const homeworkList = storage.getHomeworkForStudent(studentId);

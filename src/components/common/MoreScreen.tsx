@@ -44,7 +44,7 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
   onOpenAdmin,
   onOpenGeminiChat,
 }) => {
-  const { currentUser, role, logout, switchRoleQuick } = useAuth();
+  const { currentUser, role, isDemoMode, changePassword, logout, switchRoleQuick } = useAuth();
 
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -58,7 +58,9 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
   const [editSchool, setEditSchool] = useState('');
 
   // Password Form State
+  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordSuccess, setPasswordSuccess] = useState(false);
   const [copiedRegisterLink, setCopiedRegisterLink] = useState(false);
 
@@ -82,6 +84,9 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
   }, [currentUser]);
 
   const handleReset = () => {
+    if (role !== 'admin') {
+      return;
+    }
     if (window.confirm('هل تريد إعادة تعيين البيانات التجريبية الافتراضية؟')) {
       storage.resetToDefaultDemo();
       window.location.reload();
@@ -119,7 +124,7 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
     reader.readAsText(file);
   };
 
-  const handleSaveProfile = (e: React.FormEvent) => {
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUser) return;
 
@@ -130,15 +135,41 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
       storage.updateStudentProfile(currentUser.id, { school: editSchool });
     }
 
+    try {
+      const token = localStorage.getItem('yd_auth_token_v2');
+      await fetch('/api/auth/profile', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          name: editName,
+          subject: role === 'teacher' ? editSubject : undefined,
+          city: role === 'teacher' ? editCity : undefined,
+          school: role === 'student' ? editSchool : undefined,
+        }),
+      });
+    } catch {
+      // Offline fallback uses storage sync queue
+    }
+
     setShowEditProfile(false);
   };
 
-  const handleChangePassword = (e: React.FormEvent) => {
+  const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    setPasswordError(null);
+    const res = await changePassword(currentPassword, newPassword);
+    if (!res.success) {
+      setPasswordError(res.error || 'فشل تغيير كلمة المرور');
+      return;
+    }
     setPasswordSuccess(true);
     setTimeout(() => {
       setPasswordSuccess(false);
       setShowPasswordModal(false);
+      setCurrentPassword('');
       setNewPassword('');
     }, 1500);
   };
@@ -345,16 +376,18 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
           <ChevronLeft className="w-4 h-4 text-slate-400" />
         </button>
 
-        <button
-          onClick={onOpenAdmin}
-          className="w-full flex items-center justify-between p-3.5 hover:bg-slate-50 transition"
-        >
-          <div className="flex items-center gap-2.5">
-            <Shield className="w-4 h-4 text-purple-700" />
-            <span>لوحة تحكم إدارة النظام (Admin)</span>
-          </div>
-          <ChevronLeft className="w-4 h-4 text-slate-400" />
-        </button>
+        {(role === 'admin' || isDemoMode) && (
+          <button
+            onClick={onOpenAdmin}
+            className="w-full flex items-center justify-between p-3.5 hover:bg-slate-50 transition"
+          >
+            <div className="flex items-center gap-2.5">
+              <Shield className="w-4 h-4 text-purple-700" />
+              <span>لوحة تحكم إدارة النظام (Admin)</span>
+            </div>
+            <ChevronLeft className="w-4 h-4 text-slate-400" />
+          </button>
+        )}
 
         <button
           onClick={onOpenAuth}
@@ -368,15 +401,28 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
         </button>
 
         <button
-          onClick={handleReset}
-          className="w-full flex items-center justify-between p-3.5 hover:bg-slate-50 transition text-amber-700"
+          onClick={logout}
+          className="w-full flex items-center justify-between p-3.5 hover:bg-slate-50 transition text-slate-700"
         >
           <div className="flex items-center gap-2.5">
-            <RotateCcw className="w-4 h-4" />
-            <span>إعادة تعيين البيانات التجريبية الافتراضية</span>
+            <LogOut className="w-4 h-4 text-teal-700" />
+            <span>تسجيل الخروج من الحساب الحالي</span>
           </div>
           <ChevronLeft className="w-4 h-4 text-slate-400" />
         </button>
+
+        {role === 'admin' && (
+          <button
+            onClick={handleReset}
+            className="w-full flex items-center justify-between p-3.5 hover:bg-slate-50 transition text-amber-700"
+          >
+            <div className="flex items-center gap-2.5">
+              <RotateCcw className="w-4 h-4" />
+              <span>إعادة تعيين البيانات التجريبية الافتراضية</span>
+            </div>
+            <ChevronLeft className="w-4 h-4 text-slate-400" />
+          </button>
+        )}
 
         <button
           onClick={handleDeleteAccount}
@@ -474,22 +520,47 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
           <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl text-slate-800 space-y-3">
             <div className="flex items-center justify-between border-b border-slate-100 pb-2">
               <h3 className="font-bold text-sm text-slate-900">تغيير كلمة المرور</h3>
-              <button onClick={() => setShowPasswordModal(false)} className="text-slate-400 hover:text-slate-600">
+              <button
+                onClick={() => {
+                  setShowPasswordModal(false);
+                  setPasswordError(null);
+                }}
+                className="text-slate-400 hover:text-slate-600"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {passwordSuccess ? (
               <div className="rounded-xl bg-teal-50 border border-teal-200 p-3 text-xs text-teal-800 text-center font-bold">
-                تم تغيير كلمة المرور بنجاح!
+                تم تغيير كلمة المرور وتشفيرها بنجاح!
               </div>
             ) : (
               <form onSubmit={handleChangePassword} className="space-y-3 text-xs">
+                {passwordError && (
+                  <div className="rounded-xl bg-rose-50 border border-rose-200 p-2.5 text-rose-700 font-semibold">
+                    {passwordError}
+                  </div>
+                )}
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">كلمة المرور الجديدة</label>
+                  <label className="block font-bold text-slate-700 mb-1">
+                    كلمة المرور الحالية <span className="text-[10px] font-normal text-slate-400">(الافتراضية: 123456)</span>
+                  </label>
                   <input
                     type="password"
                     required
+                    placeholder="••••••••"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2 focus:border-teal-600 focus:outline-none dir-ltr text-right"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">كلمة المرور الجديدة (6 أحرف على الأقل)</label>
+                  <input
+                    type="password"
+                    required
+                    minLength={6}
                     placeholder="••••••••"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}

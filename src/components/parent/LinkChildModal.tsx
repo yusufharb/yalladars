@@ -1,12 +1,22 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { storage } from '../../services/storage';
+import { syncEngine } from '../../services/syncEngine';
 import { Users, X, ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 interface LinkChildModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: (childName: string) => void;
+}
+
+interface PreviewState {
+  found: boolean;
+  studentId?: string;
+  studentName?: string;
+  grade?: string;
+  school?: string;
+  alreadyLinked?: boolean;
 }
 
 export const LinkChildModal: React.FC<LinkChildModalProps> = ({
@@ -18,25 +28,96 @@ export const LinkChildModal: React.FC<LinkChildModalProps> = ({
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [preview, setPreview] = useState<PreviewState | null>(null);
+
+  useEffect(() => {
+    const cleanCode = code.trim().toUpperCase();
+    if (!isOpen || cleanCode.length < 6) {
+      setPreview(null);
+      return;
+    }
+
+    let cancelled = false;
+    const checkPreview = async () => {
+      try {
+        const res = await fetch('/api/parent/preview-student', {
+          method: 'POST',
+          headers: syncEngine.getAuthHeaders(),
+          body: JSON.stringify({ code: cleanCode }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (!cancelled && data.success) {
+            setPreview({
+              found: Boolean(data.found),
+              studentId: data.studentId,
+              studentName: data.studentName,
+              grade: data.grade,
+              school: data.school,
+              alreadyLinked: Boolean(data.alreadyLinked),
+            });
+            return;
+          }
+        }
+      } catch {
+        // Fallback to local storage when offline
+      }
+      if (!cancelled) {
+        const localPrev = storage.previewStudentByLinkingCode(cleanCode, currentUser?.id);
+        setPreview(localPrev);
+      }
+    };
+
+    checkPreview();
+    return () => {
+      cancelled = true;
+    };
+  }, [code, isOpen, currentUser?.id]);
 
   if (!isOpen) return null;
 
-  const handleLink = (e: React.FormEvent) => {
+  const handleLink = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!code.trim() || !currentUser) return;
 
     setError(null);
     setLoading(true);
 
-    const res = storage.linkChildByCode(currentUser.id, code);
-    setLoading(false);
+    try {
+      const res = await fetch('/api/parent/link-student', {
+        method: 'POST',
+        headers: syncEngine.getAuthHeaders(),
+        body: JSON.stringify({ code: code.trim().toUpperCase() }),
+      });
+      const data = await res.json();
+      setLoading(false);
 
-    if (res.success && res.studentName) {
-      onSuccess(res.studentName);
+      if (!res.ok || !data.success) {
+        setError(data.error || 'كود ربط الطالب غير صحيح');
+        return;
+      }
+
+      if (data.state) {
+        storage.importServerState(data.state);
+      } else {
+        storage.linkChildByCode(currentUser.id, code);
+      }
+
+      onSuccess(data.studentName || preview?.studentName || 'الطالب');
       onClose();
       setCode('');
-    } else {
-      setError(res.error || 'كود الطالب غير صحيح');
+    } catch {
+      // Offline fallback only when server is unreachable
+      const localRes = storage.linkChildByCode(currentUser.id, code);
+      setLoading(false);
+
+      if (localRes.success && localRes.studentName) {
+        onSuccess(localRes.studentName);
+        onClose();
+        setCode('');
+      } else {
+        setError(localRes.error || 'كود الطالب غير صحيح');
+      }
     }
   };
 
@@ -56,7 +137,7 @@ export const LinkChildModal: React.FC<LinkChildModalProps> = ({
 
         <h3 className="text-base font-bold text-slate-900 text-center">ربط حساب الابن</h3>
         <p className="mt-1 text-xs text-slate-500 text-center">
-          أدخل كود ربط الابن (Student Linking Code) الخاص بحساب ابنك
+          أدخل كود ربط الابن (Student Linking Code) الخاص بحساب ابنك للتحقق من اسمه وربطه
         </p>
 
         {error && (
@@ -74,24 +155,54 @@ export const LinkChildModal: React.FC<LinkChildModalProps> = ({
             <input
               type="text"
               required
-              placeholder="مثال: STU-1002"
+              placeholder="مثال: YD-LK-XXXX"
               value={code}
-              onChange={(e) => setCode(e.target.value.toUpperCase())}
+              onChange={(e) => {
+                setCode(e.target.value.toUpperCase());
+                setError(null);
+              }}
               className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-center font-mono text-base font-bold uppercase tracking-wider text-teal-900 focus:border-teal-600 focus:outline-none"
             />
           </div>
 
+          {preview && preview.found && (
+            <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-xs text-emerald-900 space-y-1">
+              <div className="flex items-center gap-1.5 font-bold text-emerald-800">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>تم التحقق من بيانات الطالب:</span>
+              </div>
+              <p className="font-bold text-sm text-slate-900 pr-5">{preview.studentName}</p>
+              <p className="text-[11px] text-slate-600 pr-5">
+                {preview.grade} • {preview.school}
+              </p>
+              {preview.alreadyLinked && (
+                <p className="text-[11px] font-bold text-amber-700 pr-5">
+                  هذا الطالب مربوط بحسابك بالفعل
+                </p>
+              )}
+            </div>
+          )}
+
+          {preview && !preview.found && code.trim().length >= 8 && (
+            <div className="rounded-xl bg-amber-50 border border-amber-200 p-2.5 text-xs text-amber-800 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 text-amber-600" />
+              <span>لا يوجد طالب مسجل بهذا الكود، تأكد من الكود الظاهر في حساب ابنك.</span>
+            </div>
+          )}
+
           <div className="rounded-xl bg-slate-50 p-2.5 text-[11px] text-slate-500 border border-slate-100">
-            💡 تجربة سريعة لربط طالب آخر: جرب استخدام كود الطالب التجريبي الثاني: <strong className="font-mono text-teal-800">STU-1002</strong> (يوسف مصطفى)
+            💡 يمكنك الحصول على كود الربط الفريد الخاص بابنك من داخل حسابه الشخصي في بطاقة <strong className="text-teal-800">«كود ربط ولي الأمر»</strong> بصيغة <strong className="font-mono text-teal-800">YD-LK-XXXX</strong>.
           </div>
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || (preview?.found === true && preview?.alreadyLinked === true)}
             className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-teal-700 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-teal-800 transition active:scale-95 disabled:opacity-50"
           >
             <ArrowRight className="w-4 h-4" />
-            <span>ربط الابن ومتابعة درجاته</span>
+            <span>
+              {preview?.found ? `تأكيد ربط (${preview.studentName})` : 'ربط الابن ومتابعة درجاته'}
+            </span>
           </button>
         </form>
       </div>

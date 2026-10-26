@@ -18,6 +18,7 @@ export interface User {
   phone?: string;
   status: 'active' | 'suspended';
   createdAt: string;
+  passwordHash?: string;
 }
 
 export interface TeacherProfile {
@@ -321,3 +322,11 @@ export interface LiveSession {
   endedAt?: string;
   notes?: string;
 }
+
+export interface TombstoneRecord {
+  id: string;
+  entityType: string;
+  deletedAt: number;
+  deletedBy?: string;
+}
+

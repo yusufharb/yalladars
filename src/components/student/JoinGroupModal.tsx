@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { storage } from '../../services/storage';
-import { Users, X, ArrowRight, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
+import { syncEngine } from '../../services/syncEngine';
+import { Users, X, ArrowRight, AlertCircle } from 'lucide-react';
 
 interface JoinGroupModalProps {
   isOpen: boolean;
@@ -32,26 +33,54 @@ export const JoinGroupModal: React.FC<JoinGroupModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleJoin = (e: React.FormEvent) => {
+  const handleJoin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!code.trim() || !currentUser) return;
 
     setError(null);
     setLoading(true);
 
-    const res = storage.joinGroupByCode(currentUser, code);
-    setLoading(false);
+    try {
+      const res = await fetch('/api/student/join-group', {
+        method: 'POST',
+        headers: syncEngine.getAuthHeaders(),
+        body: JSON.stringify({ code: code.trim().toUpperCase() }),
+      });
+      const data = await res.json();
+      setLoading(false);
 
-    if (res.success && res.group) {
-      if (res.pendingApproval) {
-        onSuccess(`تم إرسال طلب انضمامك إلى مجموعة (${res.group.name}) وبانتظار موافقة المدرس`);
+      if (!res.ok || !data.success) {
+        setError(data.error || 'كود الانضمام غير صحيح');
+        return;
+      }
+
+      if (data.state) {
+        storage.importServerState(data.state);
+      }
+
+      if (data.pendingApproval) {
+        onSuccess(`تم إرسال طلب انضمامك إلى مجموعة (${data.group?.name || ''}) وبانتظار موافقة المدرس`);
       } else {
-        onSuccess(`تم الانضمام بنجاح إلى: ${res.group.name}`);
+        onSuccess(data.group?.name || 'المجموعة');
       }
       onClose();
       setCode('');
-    } else {
-      setError(res.error || 'كود الانضمام غير صحيح');
+    } catch {
+      // Offline fallback when server is unreachable
+      const localRes = storage.joinGroupByCode(currentUser, code);
+      setLoading(false);
+
+      if (localRes.success && localRes.group) {
+        if (localRes.pendingApproval) {
+          onSuccess(`تم إرسال طلب انضمامك إلى مجموعة (${localRes.group.name}) وبانتظار موافقة المدرس`);
+        } else {
+          onSuccess(localRes.group.name);
+        }
+        onClose();
+        setCode('');
+      } else {
+        setError(localRes.error || 'كود الانضمام غير صحيح');
+      }
     }
   };
 

@@ -17,41 +17,33 @@ enum class AndroidSyncStatus {
 
 /**
  * YallaDars Android Native Sync Engine
- * Operates on Room SQLite Database.
- * 
- * Rules:
- * 1. Immediate local write to Room (0ms latency, works completely offline).
- * 2. Enqueues mutation to Room SyncQueueEntity.
- * 3. When network is available (or triggered periodically via WorkManager/Coroutines):
- *    a) Pushes pending queue items to Cloud Server (/api/sync/push).
- *    b) Pulls updated entities from Cloud Server (/api/sync/state?since=...).
- *    c) Commits remote entities into Room with OnConflictStrategy.REPLACE.
- *    d) Clears synchronized queue records.
+ * Operates on Room SQLite Database with JWT Bearer Auth, Composite Keys, and Tombstone Deletion Sync.
  */
 class AndroidSyncEngine private constructor(private val context: Context) {
 
     private val db = YallaDarsDatabase.getDatabase(context)
     private var lastSyncTimestamp: Long = 0L
+    @Volatile
+    var authToken: String? = null
 
-    // In production, BASE_URL points to the YallaDars Cloud Sync Server
     private val api: ApiService by lazy {
         Retrofit.Builder()
-            .baseUrl("https://yalladars.app/") // Configurable via buildConfig / server endpoint
+            .baseUrl("https://yalladars.app/")
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(ApiService::class.java)
     }
 
+    private fun getBearerHeader(): String? = authToken?.let { "Bearer $it" }
+
     suspend fun syncNow(): AndroidSyncStatus = withContext(Dispatchers.IO) {
         try {
-            // Step 1: Health / Network probe
             val health = api.getHealth()
             if (!health.isSuccessful) {
                 Log.w(TAG, "Server unreachable, remaining in offline-first mode.")
                 return@withContext AndroidSyncStatus.OFFLINE
             }
 
-            // Step 2: Push pending local Room changes
             val pendingItems = db.syncQueueDao().getPendingQueue()
             if (pendingItems.isNotEmpty()) {
                 val pushReq = SyncPushRequest(
@@ -59,7 +51,7 @@ class AndroidSyncEngine private constructor(private val context: Context) {
                     clientTimestamp = System.currentTimeMillis(),
                     changes = pendingItems
                 )
-                val pushRes = api.pushChanges(pushReq)
+                val pushRes = api.pushChanges(pushReq, getBearerHeader())
                 if (pushRes.isSuccessful && pushRes.body()?.success == true) {
                     for (item in pendingItems) {
                         db.syncQueueDao().removeFromQueue(item.queueId)
@@ -71,8 +63,7 @@ class AndroidSyncEngine private constructor(private val context: Context) {
                 }
             }
 
-            // Step 3: Pull remote updates since last timestamp
-            val pullRes = api.getSyncState(sinceTimestamp = lastSyncTimestamp)
+            val pullRes = api.getSyncState(sinceTimestamp = lastSyncTimestamp, authHeader = getBearerHeader())
             if (pullRes.isSuccessful && pullRes.body()?.success == true) {
                 val remote = pullRes.body()
                 if (remote?.state != null) {
@@ -89,7 +80,20 @@ class AndroidSyncEngine private constructor(private val context: Context) {
     }
 
     private suspend fun applyRemoteStateToRoom(state: com.yalladars.app.data.remote.RemoteDbState) {
+        // Apply tombstones (deletions) first
+        for (tomb in state.tombstones) {
+            if (tomb.entityType == "members" && tomb.id.contains("_")) {
+                val parts = tomb.id.split("_", limit = 2)
+                if (parts.size == 2) db.groupMemberDao().deleteMember(parts[0], parts[1])
+            } else if (tomb.entityType == "parentStudents" && tomb.id.contains("_")) {
+                val parts = tomb.id.split("_", limit = 2)
+                if (parts.size == 2) db.parentStudentDao().unlinkChild(parts[0], parts[1])
+            }
+        }
+
         if (state.groups.isNotEmpty()) db.groupDao().insertGroups(state.groups)
+        if (state.members.isNotEmpty()) db.groupMemberDao().insertMembers(state.members)
+        if (state.parentStudents.isNotEmpty()) db.parentStudentDao().insertParentStudents(state.parentStudents)
         if (state.attendance.isNotEmpty()) db.attendanceDao().insertAttendanceList(state.attendance)
         if (state.homework.isNotEmpty()) db.homeworkDao().insertHomeworkList(state.homework)
         if (state.grades.isNotEmpty()) db.gradeDao().insertGrades(state.grades)

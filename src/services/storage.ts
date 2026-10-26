@@ -116,10 +116,14 @@ class StorageService {
   }
 
   public exportAllDataForSync() {
+    const teachers = this.getTeachers();
+    const students = this.getStudentProfiles();
     return {
       users: this.getUsers(),
-      teachers: this.getTeachers(),
-      students: this.getStudentProfiles(),
+      teachers,
+      teacherProfiles: teachers,
+      students,
+      studentProfiles: students,
       groups: this.getGroups(),
       members: this.getMembers(),
       parentStudents: this.getParentStudents(),
@@ -140,38 +144,195 @@ class StorageService {
       quizSubmissions: this.getQuizSubmissions(),
       certificates: this.getCertificates(),
       liveSessions: this.getLiveSessions(),
+      tombstones: syncEngine.getTombstones(),
     };
+  }
+
+  private getEntityRecordKey(entityType: string, item: any): string {
+    if (!item || typeof item !== 'object') return '';
+    switch (entityType) {
+      case 'users':
+      case 'auditLogs':
+      case 'reports':
+        return String(item.id || '');
+      case 'teacherProfiles':
+      case 'teachers':
+        return String(item.teacherId || '');
+      case 'studentProfiles':
+      case 'students':
+        return String(item.studentId || '');
+      case 'groups':
+        return String(item.groupId || '');
+      case 'members':
+        return item.groupId && item.studentId ? `${item.groupId}_${item.studentId}` : '';
+      case 'parentStudents':
+        return item.parentId && item.studentId ? `${item.parentId}_${item.studentId}` : '';
+      case 'attendance':
+        return String(item.attendanceId || '');
+      case 'homework':
+        return String(item.homeworkId || '');
+      case 'assessments':
+        return String(item.assessmentId || '');
+      case 'grades':
+        return String(item.gradeId || '');
+      case 'announcements':
+        return String(item.announcementId || '');
+      case 'notes':
+        return String(item.noteId || '');
+      case 'notifications':
+        return String(item.notificationId || '');
+      case 'joinRequests':
+        return String(item.requestId || '');
+      case 'payments':
+        return String(item.paymentId || '');
+      case 'materials':
+        return String(item.materialId || '');
+      case 'badges':
+        return String(item.badgeId || '');
+      case 'quizzes':
+        return String(item.quizId || '');
+      case 'quizSubmissions':
+        return String(item.submissionId || '');
+      case 'certificates':
+        return String(item.certificateId || '');
+      case 'liveSessions':
+        return String(item.sessionId || '');
+      default:
+        return String(item.id || '');
+    }
   }
 
   public importServerState(serverState: any) {
     if (!serverState || typeof serverState !== 'object') return;
-    const sanitize = (list: any[]) => {
+    if (Array.isArray(serverState.tombstones)) {
+      const localTombs = syncEngine.getTombstones();
+      const mergedTombs = [...localTombs];
+      serverState.tombstones.forEach((t: any) => {
+        if (t && t.id && t.entityType && !mergedTombs.some((lt) => lt.entityType === t.entityType && lt.id === t.id)) {
+          mergedTombs.push(t);
+        }
+      });
+      syncEngine.setTombstones(mergedTombs);
+    }
+
+    const activeTombstones = syncEngine.getTombstones();
+    const pendingQueue = syncEngine.getQueue();
+
+    const isDeleted = (entityType: string, key: string) =>
+      activeTombstones.some((t) => t.entityType === entityType && t.id === key) ||
+      pendingQueue.some((q) => q.entityType === entityType && q.action === 'delete' && q.entityId === key);
+
+    const mergeWithPendingUpserts = (list: any[], entityType: string, keyFn: (item: any) => string) => {
       if (!Array.isArray(list)) return [];
-      return list.flat(Infinity).filter((item) => item && typeof item === 'object' && !Array.isArray(item));
+      const flat = list.flat(Infinity).filter((item) => item && typeof item === 'object' && !Array.isArray(item));
+      const byKey = new Map<string, any>();
+      for (const item of flat) {
+        const k = keyFn(item);
+        if (!k || isDeleted(entityType, k)) continue;
+        byKey.set(k, item);
+      }
+      // Overlay any pending local upserts that haven't been confirmed by the server yet
+      for (const q of pendingQueue) {
+        if (q.entityType === entityType && q.action === 'upsert' && q.payload && typeof q.payload === 'object') {
+          const k = keyFn(q.payload) || q.entityId;
+          if (k && !isDeleted(entityType, k)) {
+            byKey.set(k, q.payload);
+          }
+        }
+      }
+      return Array.from(byKey.values());
     };
-    if (Array.isArray(serverState.users)) this.set(STORAGE_KEYS.USERS, sanitize(serverState.users), false);
-    if (Array.isArray(serverState.teachers)) this.set(STORAGE_KEYS.TEACHERS, sanitize(serverState.teachers), false);
-    if (Array.isArray(serverState.students)) this.set(STORAGE_KEYS.STUDENTS, sanitize(serverState.students), false);
-    if (Array.isArray(serverState.groups)) this.set(STORAGE_KEYS.GROUPS, sanitize(serverState.groups), false);
-    if (Array.isArray(serverState.members)) this.set(STORAGE_KEYS.MEMBERS, sanitize(serverState.members), false);
-    if (Array.isArray(serverState.parentStudents)) this.set(STORAGE_KEYS.PARENT_STUDENTS, sanitize(serverState.parentStudents), false);
-    if (Array.isArray(serverState.attendance)) this.set(STORAGE_KEYS.ATTENDANCE, sanitize(serverState.attendance), false);
-    if (Array.isArray(serverState.homework)) this.set(STORAGE_KEYS.HOMEWORK, sanitize(serverState.homework), false);
-    if (Array.isArray(serverState.assessments)) this.set(STORAGE_KEYS.ASSESSMENTS, sanitize(serverState.assessments), false);
-    if (Array.isArray(serverState.grades)) this.set(STORAGE_KEYS.GRADES, sanitize(serverState.grades), false);
-    if (Array.isArray(serverState.announcements)) this.set(STORAGE_KEYS.ANNOUNCEMENTS, sanitize(serverState.announcements), false);
-    if (Array.isArray(serverState.notes)) this.set(STORAGE_KEYS.NOTES, sanitize(serverState.notes), false);
-    if (Array.isArray(serverState.notifications)) this.set(STORAGE_KEYS.NOTIFICATIONS, sanitize(serverState.notifications), false);
-    if (Array.isArray(serverState.joinRequests)) this.set(STORAGE_KEYS.JOIN_REQUESTS, sanitize(serverState.joinRequests), false);
-    if (Array.isArray(serverState.auditLogs)) this.set(STORAGE_KEYS.AUDIT_LOGS, sanitize(serverState.auditLogs), false);
-    if (Array.isArray(serverState.reports)) this.set(STORAGE_KEYS.REPORTS, sanitize(serverState.reports), false);
-    if (Array.isArray(serverState.payments)) this.set(STORAGE_KEYS.PAYMENTS, sanitize(serverState.payments), false);
-    if (Array.isArray(serverState.materials)) this.set(STORAGE_KEYS.MATERIALS, sanitize(serverState.materials), false);
-    if (Array.isArray(serverState.badges)) this.set(STORAGE_KEYS.BADGES, sanitize(serverState.badges), false);
-    if (Array.isArray(serverState.quizzes)) this.set(STORAGE_KEYS.QUIZZES, sanitize(serverState.quizzes), false);
-    if (Array.isArray(serverState.quizSubmissions)) this.set(STORAGE_KEYS.QUIZ_SUBMISSIONS, sanitize(serverState.quizSubmissions), false);
-    if (Array.isArray(serverState.certificates)) this.set(STORAGE_KEYS.CERTIFICATES, sanitize(serverState.certificates), false);
-    if (Array.isArray(serverState.liveSessions)) this.set(STORAGE_KEYS.LIVE_SESSIONS, sanitize(serverState.liveSessions), false);
+
+    if (Array.isArray(serverState.users)) {
+      const existingUsers = this.getUsers();
+      const serverUsers = mergeWithPendingUpserts(serverState.users, 'users', (u) => u.id).map((u) => {
+        const prev = existingUsers.find((eu) => eu.id === u.id);
+        return {
+          ...u,
+          passwordHash: u.passwordHash || prev?.passwordHash,
+        };
+      });
+      this.set(STORAGE_KEYS.USERS, serverUsers, false);
+    }
+    const incomingTeachers = serverState.teacherProfiles || serverState.teachers;
+    if (Array.isArray(incomingTeachers)) {
+      const mergedTeachers = mergeWithPendingUpserts(incomingTeachers, 'teacherProfiles', (t) => t.teacherId);
+      this.set(STORAGE_KEYS.TEACHERS, mergedTeachers, false);
+    }
+    const incomingStudents = serverState.studentProfiles || serverState.students;
+    if (Array.isArray(incomingStudents)) {
+      const mergedStudents = mergeWithPendingUpserts(incomingStudents, 'studentProfiles', (s) => s.studentId);
+      this.set(STORAGE_KEYS.STUDENTS, mergedStudents, false);
+    }
+    if (Array.isArray(serverState.groups)) {
+      this.set(STORAGE_KEYS.GROUPS, mergeWithPendingUpserts(serverState.groups, 'groups', (g) => g.groupId), false);
+    }
+    if (Array.isArray(serverState.members)) {
+      this.set(
+        STORAGE_KEYS.MEMBERS,
+        mergeWithPendingUpserts(serverState.members, 'members', (m) => `${m.groupId}_${m.studentId}`),
+        false
+      );
+    }
+    if (Array.isArray(serverState.parentStudents)) {
+      this.set(
+        STORAGE_KEYS.PARENT_STUDENTS,
+        mergeWithPendingUpserts(serverState.parentStudents, 'parentStudents', (ps) => `${ps.parentId}_${ps.studentId}`),
+        false
+      );
+    }
+    if (Array.isArray(serverState.attendance)) {
+      this.set(STORAGE_KEYS.ATTENDANCE, mergeWithPendingUpserts(serverState.attendance, 'attendance', (a) => a.attendanceId), false);
+    }
+    if (Array.isArray(serverState.homework)) {
+      this.set(STORAGE_KEYS.HOMEWORK, mergeWithPendingUpserts(serverState.homework, 'homework', (h) => h.homeworkId), false);
+    }
+    if (Array.isArray(serverState.assessments)) {
+      this.set(STORAGE_KEYS.ASSESSMENTS, mergeWithPendingUpserts(serverState.assessments, 'assessments', (a) => a.assessmentId), false);
+    }
+    if (Array.isArray(serverState.grades)) {
+      this.set(STORAGE_KEYS.GRADES, mergeWithPendingUpserts(serverState.grades, 'grades', (g) => g.gradeId), false);
+    }
+    if (Array.isArray(serverState.announcements)) {
+      this.set(STORAGE_KEYS.ANNOUNCEMENTS, mergeWithPendingUpserts(serverState.announcements, 'announcements', (a) => a.announcementId), false);
+    }
+    if (Array.isArray(serverState.notes)) {
+      this.set(STORAGE_KEYS.NOTES, mergeWithPendingUpserts(serverState.notes, 'notes', (n) => n.noteId), false);
+    }
+    if (Array.isArray(serverState.notifications)) {
+      this.set(STORAGE_KEYS.NOTIFICATIONS, mergeWithPendingUpserts(serverState.notifications, 'notifications', (n) => n.notificationId), false);
+    }
+    if (Array.isArray(serverState.joinRequests)) {
+      this.set(STORAGE_KEYS.JOIN_REQUESTS, mergeWithPendingUpserts(serverState.joinRequests, 'joinRequests', (r) => r.requestId), false);
+    }
+    if (Array.isArray(serverState.auditLogs)) {
+      this.set(STORAGE_KEYS.AUDIT_LOGS, mergeWithPendingUpserts(serverState.auditLogs, 'auditLogs', (l) => l.id), false);
+    }
+    if (Array.isArray(serverState.reports)) {
+      this.set(STORAGE_KEYS.REPORTS, mergeWithPendingUpserts(serverState.reports, 'reports', (r) => r.id), false);
+    }
+    if (Array.isArray(serverState.payments)) {
+      this.set(STORAGE_KEYS.PAYMENTS, mergeWithPendingUpserts(serverState.payments, 'payments', (p) => p.paymentId), false);
+    }
+    if (Array.isArray(serverState.materials)) {
+      this.set(STORAGE_KEYS.MATERIALS, mergeWithPendingUpserts(serverState.materials, 'materials', (m) => m.materialId), false);
+    }
+    if (Array.isArray(serverState.badges)) {
+      this.set(STORAGE_KEYS.BADGES, mergeWithPendingUpserts(serverState.badges, 'badges', (b) => b.badgeId), false);
+    }
+    if (Array.isArray(serverState.quizzes)) {
+      this.set(STORAGE_KEYS.QUIZZES, mergeWithPendingUpserts(serverState.quizzes, 'quizzes', (q) => q.quizId), false);
+    }
+    if (Array.isArray(serverState.quizSubmissions)) {
+      this.set(STORAGE_KEYS.QUIZ_SUBMISSIONS, mergeWithPendingUpserts(serverState.quizSubmissions, 'quizSubmissions', (s) => s.submissionId), false);
+    }
+    if (Array.isArray(serverState.certificates)) {
+      this.set(STORAGE_KEYS.CERTIFICATES, mergeWithPendingUpserts(serverState.certificates, 'certificates', (c) => c.certificateId), false);
+    }
+    if (Array.isArray(serverState.liveSessions)) {
+      this.set(STORAGE_KEYS.LIVE_SESSIONS, mergeWithPendingUpserts(serverState.liveSessions, 'liveSessions', (s) => s.sessionId), false);
+    }
+    this.repairParentStudentLinks(false);
     this.notify();
   }
 
@@ -210,7 +371,7 @@ class StorageService {
       localStorage.setItem(STORAGE_KEYS.INITIALIZED, 'true');
       this.notify();
     } else {
-      // Validate and clean any legacy nested arrays in localStorage, and ensure seed users exist
+      // Clean any legacy nested arrays in localStorage without re-injecting unfiltered seed data
       try {
         const storedUsers = localStorage.getItem(STORAGE_KEYS.USERS);
         if (storedUsers) {
@@ -220,80 +381,102 @@ class StorageService {
             localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(cleaned));
           }
         }
-
-        const currentUsers = this.getUsers();
-        let usersUpdated = false;
-        for (const initU of INITIAL_USERS) {
-          const existing = currentUsers.find(u => u.id === initU.id);
-          if (!existing) {
-            currentUsers.push(initU);
-            usersUpdated = true;
-          } else if (existing.status !== initU.status || existing.name !== initU.name) {
-            existing.status = initU.status;
-            existing.name = initU.name;
-            usersUpdated = true;
-          }
-        }
-        if (usersUpdated) {
-          this.set(STORAGE_KEYS.USERS, currentUsers, false);
-        }
-
-        const currentStudents = this.getStudentProfiles();
-        let stuUpdated = false;
-        for (const initStu of INITIAL_STUDENTS) {
-          if (!currentStudents.some(s => s.studentId === initStu.studentId)) {
-            currentStudents.push(initStu);
-            stuUpdated = true;
-          }
-        }
-        if (stuUpdated) {
-          this.set(STORAGE_KEYS.STUDENTS, currentStudents, false);
-        }
-
-        const currentMembers = this.getMembers();
-        let memUpdated = false;
-        for (const initMem of INITIAL_MEMBERS) {
-          if (!currentMembers.some(m => m.groupId === initMem.groupId && m.studentId === initMem.studentId)) {
-            currentMembers.push(initMem);
-            memUpdated = true;
-          }
-        }
-        if (memUpdated) {
-          this.set(STORAGE_KEYS.MEMBERS, currentMembers, false);
-        }
-
-        const currentPS = this.getParentStudents();
-        let psUpdated = false;
-        for (const initPS of INITIAL_PARENT_STUDENTS) {
-          if (!currentPS.some(p => p.parentId === initPS.parentId && p.studentId === initPS.studentId)) {
-            currentPS.push(initPS);
-            psUpdated = true;
-          }
-        }
-        if (psUpdated) {
-          this.set(STORAGE_KEYS.PARENT_STUDENTS, currentPS, false);
-        }
-
-        // Initialize any missing new collections
-        if (!localStorage.getItem(STORAGE_KEYS.PAYMENTS)) {
-          localStorage.setItem(STORAGE_KEYS.PAYMENTS, JSON.stringify(INITIAL_PAYMENTS));
-        }
-        if (!localStorage.getItem(STORAGE_KEYS.MATERIALS)) {
-          localStorage.setItem(STORAGE_KEYS.MATERIALS, JSON.stringify(INITIAL_MATERIALS));
-        }
-        if (!localStorage.getItem(STORAGE_KEYS.BADGES)) {
-          localStorage.setItem(STORAGE_KEYS.BADGES, JSON.stringify(INITIAL_BADGES));
-        }
-        if (!localStorage.getItem(STORAGE_KEYS.QUIZZES)) {
-          localStorage.setItem(STORAGE_KEYS.QUIZZES, JSON.stringify(INITIAL_QUIZZES));
-        }
-        if (!localStorage.getItem(STORAGE_KEYS.QUIZ_SUBMISSIONS)) {
-          localStorage.setItem(STORAGE_KEYS.QUIZ_SUBMISSIONS, JSON.stringify(INITIAL_QUIZ_SUBMISSIONS));
-        }
-        if (!localStorage.getItem(STORAGE_KEYS.CERTIFICATES)) {
-          localStorage.setItem(STORAGE_KEYS.CERTIFICATES, JSON.stringify(INITIAL_CERTIFICATES));
-        }
+        this.repairParentStudentLinks(false);
       } catch {}
+    }
+  }
+
+  public generateUniqueLinkingCode(existingProfiles?: StudentProfile[]): string {
+    const profiles = existingProfiles || this.getStudentProfiles();
+    const usedCodes = new Set(
+      profiles.map((p) => (p.linkingCode || '').trim().toUpperCase()).filter(Boolean)
+    );
+    // Reserve all initial demo codes so a newly registered student never gets a demo code
+    INITIAL_STUDENTS.forEach((s) => usedCodes.add(s.linkingCode.toUpperCase()));
+
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    for (let attempt = 0; attempt < 100; attempt++) {
+      let randomPart = '';
+      for (let i = 0; i < 4; i++) {
+        randomPart += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      const candidate = `YD-LK-${randomPart}`;
+      if (!usedCodes.has(candidate)) {
+        return candidate;
+      }
+    }
+    return `YD-LK-${Date.now().toString(36).slice(-4).toUpperCase()}`;
+  }
+
+  public repairParentStudentLinks(shouldSaveToSync = false): void {
+    const users = this.getUsers();
+    const students = this.getStudentProfiles();
+    let studentsChanged = false;
+
+    // 1. Ensure every student user has a StudentProfile with a unique linkingCode
+    const seenCodes = new Set<string>();
+    // Reserve YD-LK-1001 strictly for user_student_1
+    for (const s of students) {
+      if (s.studentId === 'user_student_1') {
+        if (s.linkingCode !== 'YD-LK-1001') {
+          s.linkingCode = 'YD-LK-1001';
+          studentsChanged = true;
+        }
+        seenCodes.add('YD-LK-1001');
+      }
+    }
+
+    for (const s of students) {
+      if (s.studentId === 'user_student_1') continue;
+      const normCode = (s.linkingCode || '').trim().toUpperCase();
+      if (!normCode || normCode === 'YD-LK-1001' || seenCodes.has(normCode)) {
+        s.linkingCode = this.generateUniqueLinkingCode(students);
+        studentsChanged = true;
+      }
+      seenCodes.add(s.linkingCode.toUpperCase());
+    }
+
+    for (const u of users) {
+      if (u.role === 'student' && !students.some((s) => s.studentId === u.id)) {
+        const newCode = this.generateUniqueLinkingCode(students);
+        seenCodes.add(newCode);
+        students.push({
+          studentId: u.id,
+          grade: 'الصف الأول الثانوي',
+          school: 'مدرسة حكومية',
+          linkingCode: newCode,
+        });
+        studentsChanged = true;
+      }
+    }
+
+    if (studentsChanged) {
+      this.set(STORAGE_KEYS.STUDENTS, students, shouldSaveToSync);
+    }
+
+    // 2. Keep studentName, grade, and school in sync with canonical user & profile records
+    const parentStudents = this.getParentStudents();
+    let psChanged = false;
+
+    for (const ps of parentStudents) {
+      const su = users.find((u) => u.id === ps.studentId);
+      const sp = students.find((s) => s.studentId === ps.studentId);
+      if (su && su.name && ps.studentName !== su.name) {
+        ps.studentName = su.name;
+        psChanged = true;
+      }
+      if (sp && sp.grade && ps.grade !== sp.grade) {
+        ps.grade = sp.grade;
+        psChanged = true;
+      }
+      if (sp && sp.school && ps.school !== sp.school) {
+        ps.school = sp.school;
+        psChanged = true;
+      }
+    }
+
+    if (psChanged) {
+      this.set(STORAGE_KEYS.PARENT_STUDENTS, parentStudents, shouldSaveToSync);
     }
   }
 
@@ -323,51 +506,79 @@ class StorageService {
     const sanitizedValue = Array.isArray(value)
       ? (value.flat(Infinity).filter((item: any) => item && typeof item === 'object' && !Array.isArray(item)) as unknown as T)
       : value;
-    localStorage.setItem(key, JSON.stringify(sanitizedValue));
-    
-    if (shouldEnqueueSync) {
-      // Map storage key to sync entity type
-      const keyMap: Record<string, string> = {
-        [STORAGE_KEYS.USERS]: 'users',
-        [STORAGE_KEYS.TEACHERS]: 'teachers',
-        [STORAGE_KEYS.STUDENTS]: 'students',
-        [STORAGE_KEYS.GROUPS]: 'groups',
-        [STORAGE_KEYS.MEMBERS]: 'members',
-        [STORAGE_KEYS.PARENT_STUDENTS]: 'parentStudents',
-        [STORAGE_KEYS.ATTENDANCE]: 'attendance',
-        [STORAGE_KEYS.HOMEWORK]: 'homework',
-        [STORAGE_KEYS.ASSESSMENTS]: 'assessments',
-        [STORAGE_KEYS.GRADES]: 'grades',
-        [STORAGE_KEYS.ANNOUNCEMENTS]: 'announcements',
-        [STORAGE_KEYS.NOTES]: 'notes',
-        [STORAGE_KEYS.NOTIFICATIONS]: 'notifications',
-        [STORAGE_KEYS.JOIN_REQUESTS]: 'joinRequests',
-        [STORAGE_KEYS.AUDIT_LOGS]: 'auditLogs',
-        [STORAGE_KEYS.REPORTS]: 'reports',
-        [STORAGE_KEYS.PAYMENTS]: 'payments',
-        [STORAGE_KEYS.MATERIALS]: 'materials',
-        [STORAGE_KEYS.BADGES]: 'badges',
-        [STORAGE_KEYS.QUIZZES]: 'quizzes',
-        [STORAGE_KEYS.QUIZ_SUBMISSIONS]: 'quizSubmissions',
-        [STORAGE_KEYS.CERTIFICATES]: 'certificates',
-        [STORAGE_KEYS.LIVE_SESSIONS]: 'liveSessions',
-      };
-      const entityType = keyMap[key];
-      if (entityType) {
-        syncEngine.enqueueChange(entityType, 'upsert', value);
+
+    const keyMap: Record<string, string> = {
+      [STORAGE_KEYS.USERS]: 'users',
+      [STORAGE_KEYS.TEACHERS]: 'teacherProfiles',
+      [STORAGE_KEYS.STUDENTS]: 'studentProfiles',
+      [STORAGE_KEYS.GROUPS]: 'groups',
+      [STORAGE_KEYS.MEMBERS]: 'members',
+      [STORAGE_KEYS.PARENT_STUDENTS]: 'parentStudents',
+      [STORAGE_KEYS.ATTENDANCE]: 'attendance',
+      [STORAGE_KEYS.HOMEWORK]: 'homework',
+      [STORAGE_KEYS.ASSESSMENTS]: 'assessments',
+      [STORAGE_KEYS.GRADES]: 'grades',
+      [STORAGE_KEYS.ANNOUNCEMENTS]: 'announcements',
+      [STORAGE_KEYS.NOTES]: 'notes',
+      [STORAGE_KEYS.NOTIFICATIONS]: 'notifications',
+      [STORAGE_KEYS.JOIN_REQUESTS]: 'joinRequests',
+      [STORAGE_KEYS.AUDIT_LOGS]: 'auditLogs',
+      [STORAGE_KEYS.REPORTS]: 'reports',
+      [STORAGE_KEYS.PAYMENTS]: 'payments',
+      [STORAGE_KEYS.MATERIALS]: 'materials',
+      [STORAGE_KEYS.BADGES]: 'badges',
+      [STORAGE_KEYS.QUIZZES]: 'quizzes',
+      [STORAGE_KEYS.QUIZ_SUBMISSIONS]: 'quizSubmissions',
+      [STORAGE_KEYS.CERTIFICATES]: 'certificates',
+      [STORAGE_KEYS.LIVE_SESSIONS]: 'liveSessions',
+    };
+
+    const entityType = keyMap[key];
+    let previousItemsMap = new Map<string, string>();
+    if (shouldEnqueueSync && entityType && Array.isArray(sanitizedValue)) {
+      const prevArr = this.get<any[]>(key, []);
+      for (const prevItem of prevArr) {
+        const k = this.getEntityRecordKey(entityType, prevItem);
+        if (k) {
+          previousItemsMap.set(k, JSON.stringify(prevItem));
+        }
       }
     }
-    
+
+    localStorage.setItem(key, JSON.stringify(sanitizedValue));
+
+    if (shouldEnqueueSync && entityType && Array.isArray(sanitizedValue)) {
+      for (const item of sanitizedValue) {
+        const recordKey = this.getEntityRecordKey(entityType, item);
+        if (!recordKey) continue;
+        const serialized = JSON.stringify(item);
+        if (previousItemsMap.get(recordKey) !== serialized) {
+          if (entityType === 'users') {
+            const { passwordHash, ...safeUser } = item as any;
+            syncEngine.enqueueChange(entityType, 'upsert', recordKey, safeUser);
+          } else {
+            syncEngine.enqueueChange(entityType, 'upsert', recordKey, item);
+          }
+        }
+      }
+    }
+
     this.notify();
   }
 
   // --- Auth / Current User ---
   public getCurrentUser(): User | null {
-    return this.get<User | null>(STORAGE_KEYS.CURRENT_USER, INITIAL_USERS[0]);
+    return this.get<User | null>(STORAGE_KEYS.CURRENT_USER, null);
   }
 
   public setCurrentUser(user: User | null): void {
-    this.set(STORAGE_KEYS.CURRENT_USER, user);
+    if (typeof window === 'undefined') return;
+    if (!user) {
+      localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+      this.notify();
+      return;
+    }
+    this.set(STORAGE_KEYS.CURRENT_USER, user, false);
   }
 
   public getUsers(): User[] {
@@ -378,15 +589,47 @@ class StorageService {
     return this.getUsers().find((u) => u.id === id);
   }
 
+  private hashPasswordLocal(password: string): string {
+    // Deterministic salted hash for offline verification compatibility
+    const salted = `yalladars_salt_2026:${password}`;
+    let h1 = 0xdeadbeef ^ salted.length;
+    let h2 = 0x41c6ce57 ^ salted.length;
+    for (let i = 0, ch; i < salted.length; i++) {
+      ch = salted.charCodeAt(i);
+      h1 = Math.imul(h1 ^ ch, 2654435761);
+      h2 = Math.imul(h2 ^ ch, 1597334677);
+    }
+    h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+    h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+    const hex = (h2 >>> 0).toString(16).padStart(8, '0') + (h1 >>> 0).toString(16).padStart(8, '0');
+    return `local$${hex}`;
+  }
+
+  private verifyPasswordLocal(password: string, storedHash?: string): boolean {
+    if (!password) return false;
+    if (!storedHash || storedHash.startsWith('scrypt$')) {
+      // Initial demo accounts default password is '123456' when offline
+      return password === '123456';
+    }
+    if (storedHash.startsWith('local$')) {
+      return this.hashPasswordLocal(password) === storedHash;
+    }
+    return storedHash === password;
+  }
+
   public registerUser(params: {
+    id?: string;
     name: string;
     email: string;
+    password?: string;
     role: UserRole;
     phone?: string;
     subject?: string;
+    city?: string;
     grade?: string;
     school?: string;
-  }): { success: boolean; user?: User; error?: string } {
+    linkingCode?: string;
+  }): { success: boolean; user?: User; linkingCode?: string; error?: string } {
     const users = this.getUsers();
     const cleanEmail = params.email.trim().toLowerCase();
 
@@ -396,12 +639,15 @@ class StorageService {
     if (!cleanEmail || !cleanEmail.includes('@')) {
       return { success: false, error: 'البريد الإلكتروني غير صحيح' };
     }
+    if (!params.password || params.password.length < 6) {
+      return { success: false, error: 'كلمة المرور مطلوبة ويجب ألا تقل عن 6 أحرف' };
+    }
 
     if (users.some((u) => u.email.toLowerCase() === cleanEmail)) {
       return { success: false, error: 'البريد الإلكتروني مسجل مسبقاً' };
     }
 
-    const newId = `user_${Date.now()}`;
+    const newId = params.id || `user_${params.role}_${Date.now()}`;
     const newUser: User = {
       id: newId,
       name: params.name.trim(),
@@ -409,11 +655,14 @@ class StorageService {
       role: params.role,
       phone: params.phone?.trim() || '',
       status: 'active',
-      createdAt: new Date().toISOString(),
+      createdAt: new Date().toISOString().split('T')[0],
+      passwordHash: this.hashPasswordLocal(params.password),
     };
 
     users.push(newUser);
     this.set(STORAGE_KEYS.USERS, users);
+
+    let generatedLinkingCode: string | undefined;
 
     // Profile specifics
     if (params.role === 'teacher') {
@@ -422,23 +671,23 @@ class StorageService {
         teacherId: newId,
         subject: params.subject?.trim() || 'عام',
         grades: params.grade ? [params.grade] : ['المرحلة الثانوية'],
-        city: 'مصر',
+        city: params.city?.trim() || 'القاهرة',
       });
       this.set(STORAGE_KEYS.TEACHERS, teachers);
     } else if (params.role === 'student') {
       const students = this.get<StudentProfile[]>(STORAGE_KEYS.STUDENTS, []);
-      const linkingCode = `YD-LK-${Math.floor(1000 + Math.random() * 9000)}`;
+      generatedLinkingCode = params.linkingCode || this.generateUniqueLinkingCode(students);
       students.push({
         studentId: newId,
         grade: params.grade?.trim() || 'الصف الأول الثانوي',
         school: params.school?.trim() || 'مدرسة حكومية',
-        linkingCode,
+        linkingCode: generatedLinkingCode,
       });
       this.set(STORAGE_KEYS.STUDENTS, students);
     }
 
     this.setCurrentUser(newUser);
-    return { success: true, user: newUser };
+    return { success: true, user: newUser, linkingCode: generatedLinkingCode };
   }
 
   public getTeachers(): TeacherProfile[] {
@@ -486,7 +735,11 @@ class StorageService {
     return false;
   }
 
-  public loginUser(email: string): { success: boolean; user?: User; error?: string } {
+  public loginUser(
+    email: string,
+    password?: string,
+    isDemoQuickLogin = false
+  ): { success: boolean; user?: User; error?: string } {
     const users = this.getUsers();
     const cleanEmail = email.trim().toLowerCase();
     const found = users.find((u) => u.email.toLowerCase() === cleanEmail);
@@ -498,8 +751,45 @@ class StorageService {
       return { success: false, error: 'تم تعطيل هذا الحساب من قبل الإدارة' };
     }
 
+    if (!isDemoQuickLogin) {
+      if (!password) {
+        return { success: false, error: 'يرجى إدخال كلمة المرور' };
+      }
+      if (!this.verifyPasswordLocal(password, found.passwordHash)) {
+        return { success: false, error: 'كلمة المرور غير صحيحة' };
+      }
+    }
+
     this.setCurrentUser(found);
     return { success: true, user: found };
+  }
+
+  public changeUserPassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string
+  ): { success: boolean; error?: string } {
+    if (!newPassword || newPassword.length < 6) {
+      return { success: false, error: 'كلمة المرور الجديدة يجب أن تتكون من 6 أحرف على الأقل' };
+    }
+    const users = this.getUsers();
+    const idx = users.findIndex((u) => u.id === userId);
+    if (idx < 0) {
+      return { success: false, error: 'المستخدم غير موجود' };
+    }
+    if (currentPassword && !this.verifyPasswordLocal(currentPassword, users[idx].passwordHash)) {
+      return { success: false, error: 'كلمة المرور الحالية غير صحيحة' };
+    }
+    users[idx].passwordHash = this.hashPasswordLocal(newPassword);
+    this.set(STORAGE_KEYS.USERS, users);
+    this.addAuditLog({
+      userId,
+      userName: users[idx].name,
+      userRole: users[idx].role,
+      action: 'تغيير كلمة المرور',
+      details: 'تم تحديث كلمة المرور وتشفيرها بنجاح',
+    });
+    return { success: true };
   }
 
   // --- Groups ---
@@ -749,15 +1039,48 @@ class StorageService {
   }
 
   public getStudentProfile(studentId: string): StudentProfile | undefined {
-    return this.getStudentProfiles().find((s) => s.studentId === studentId);
+    const profiles = this.getStudentProfiles();
+    const existing = profiles.find((s) => s.studentId === studentId);
+    if (existing) {
+      // Ensure non-demo students never accidentally share YD-LK-1001
+      if (studentId !== 'user_student_1' && existing.linkingCode === 'YD-LK-1001') {
+        existing.linkingCode = this.generateUniqueLinkingCode(profiles);
+        this.set(STORAGE_KEYS.STUDENTS, profiles);
+      }
+      return existing;
+    }
+
+    // Auto-create StudentProfile if a student user exists without a profile
+    const user = this.getUserById(studentId) || (this.getCurrentUser()?.id === studentId ? this.getCurrentUser() : undefined);
+    if (user && user.role === 'student') {
+      const newProfile: StudentProfile = {
+        studentId: user.id,
+        grade: 'الصف الأول الثانوي',
+        school: 'مدرسة حكومية',
+        linkingCode: studentId === 'user_student_1' ? 'YD-LK-1001' : this.generateUniqueLinkingCode(profiles),
+      };
+      profiles.push(newProfile);
+      this.set(STORAGE_KEYS.STUDENTS, profiles);
+      return newProfile;
+    }
+    return undefined;
   }
 
   public regenerateStudentLinkingCode(studentId: string): string {
     const profiles = this.getStudentProfiles();
-    const prof = profiles.find((s) => s.studentId === studentId);
-    const newCode = `YD-LK-${Math.floor(1000 + Math.random() * 9000)}`;
+    let prof = profiles.find((s) => s.studentId === studentId);
+    const newCode = this.generateUniqueLinkingCode(profiles);
     if (prof) {
       prof.linkingCode = newCode;
+      this.set(STORAGE_KEYS.STUDENTS, profiles);
+    } else {
+      prof = {
+        studentId,
+        grade: 'الصف الأول الثانوي',
+        school: 'مدرسة حكومية',
+        linkingCode: newCode,
+      };
+      profiles.push(prof);
       this.set(STORAGE_KEYS.STUDENTS, profiles);
     }
     const studentUser = this.getUserById(studentId);
@@ -779,8 +1102,48 @@ class StorageService {
     return this.getParentStudents().filter((ps) => ps.parentId === parentId && ps.status === 'active');
   }
 
+  public previewStudentByLinkingCode(
+    linkingCode: string,
+    parentId?: string
+  ): {
+    found: boolean;
+    studentId?: string;
+    studentName?: string;
+    grade?: string;
+    school?: string;
+    alreadyLinked?: boolean;
+  } {
+    const cleanCode = linkingCode.trim().toUpperCase();
+    if (!cleanCode) return { found: false };
+    // Ensure all registered students have profiles before searching
+    this.repairParentStudentLinks(false);
+    const studentProfile = this.getStudentProfiles().find((s) => s.linkingCode.toUpperCase() === cleanCode);
+    if (!studentProfile) return { found: false };
+
+    const studentUser = this.getUserById(studentProfile.studentId);
+    const memberRecord = this.getMembers().find((m) => m.studentId === studentProfile.studentId);
+    const resolvedName = studentUser?.name || memberRecord?.studentName;
+    if (!resolvedName) return { found: false };
+
+    const alreadyLinked = parentId
+      ? this.getParentStudents().some(
+          (ps) => ps.parentId === parentId && ps.studentId === studentProfile.studentId && ps.status === 'active'
+        )
+      : false;
+
+    return {
+      found: true,
+      studentId: studentProfile.studentId,
+      studentName: resolvedName,
+      grade: studentProfile.grade,
+      school: studentProfile.school,
+      alreadyLinked,
+    };
+  }
+
   public linkChildByCode(parentId: string, linkingCode: string): { success: boolean; studentName?: string; error?: string } {
     const cleanCode = linkingCode.trim().toUpperCase();
+    this.repairParentStudentLinks(false);
     const studentProfile = this.getStudentProfiles().find((s) => s.linkingCode.toUpperCase() === cleanCode);
 
     if (!studentProfile) {
@@ -788,7 +1151,9 @@ class StorageService {
     }
 
     const studentUser = this.getUserById(studentProfile.studentId);
-    if (!studentUser) {
+    const memberRecord = this.getMembers().find((m) => m.studentId === studentProfile.studentId);
+    const resolvedStudentName = studentUser?.name || memberRecord?.studentName;
+    if (!resolvedStudentName) {
       return { success: false, error: 'بيانات الطالب غير متوفرة' };
     }
 
@@ -799,10 +1164,13 @@ class StorageService {
       return { success: false, error: 'تم ربط هذا الطالب بحسابك من قبل!' };
     }
 
+    // Remove any previous tombstone if re-linking
+    syncEngine.removeTombstone('parentStudents', `${parentId}_${studentProfile.studentId}`);
+
     parentStudents.push({
       parentId,
       studentId: studentProfile.studentId,
-      studentName: studentUser.name,
+      studentName: resolvedStudentName,
       grade: studentProfile.grade,
       school: studentProfile.school,
       linkedAt: new Date().toISOString().split('T')[0],
@@ -814,17 +1182,18 @@ class StorageService {
     this.addNotification({
       userId: parentId,
       title: 'تم ربط الابن بنجاح',
-      body: `تم ربط حساب الابن (${studentUser.name}) بحسابك بنجاح. يمكنك الآن متابعة حضوره ودرجاته وواجباته.`,
+      body: `تم ربط حساب الابن (${resolvedStudentName}) بحسابك بنجاح. يمكنك الآن متابعة حضوره ودرجاته وواجباته.`,
       type: 'session',
     });
 
-    return { success: true, studentName: studentUser.name };
+    return { success: true, studentName: resolvedStudentName };
   }
 
   public unlinkChild(parentId: string, studentId: string): boolean {
     const parentStudents = this.getParentStudents();
     const target = parentStudents.find((ps) => ps.parentId === parentId && ps.studentId === studentId);
     if (target) {
+      syncEngine.addTombstone('parentStudents', `${parentId}_${studentId}`, parentId);
       const filtered = parentStudents.filter((ps) => !(ps.parentId === parentId && ps.studentId === studentId));
       this.set(STORAGE_KEYS.PARENT_STUDENTS, filtered);
 
@@ -1816,10 +2185,13 @@ class StorageService {
   }
 
   public exportFullBackupJSON(): string {
+    const allData = this.exportAllDataForSync();
+    const safeUsers = (allData.users || []).map(({ passwordHash, ...u }: any) => u);
     const backupData = {
       version: '2.0.0',
       exportedAt: new Date().toISOString(),
-      ...this.exportAllDataForSync(),
+      ...allData,
+      users: safeUsers,
     };
     return JSON.stringify(backupData, null, 2);
   }
@@ -1827,8 +2199,19 @@ class StorageService {
   public importFullBackupJSON(jsonStr: string): { success: boolean; error?: string } {
     try {
       const data = JSON.parse(jsonStr);
-      if (!data.version || !Array.isArray(data.users) || !Array.isArray(data.groups)) {
+      if (!data || typeof data !== 'object' || !data.version || !Array.isArray(data.users) || !Array.isArray(data.groups)) {
         return { success: false, error: 'الملف غير صالح أو لا يحتوي على بنية بيانات يلا درس الصحيحة' };
+      }
+
+      const validUsers = data.users.every(
+        (u: any) => u && typeof u.id === 'string' && typeof u.name === 'string' && typeof u.email === 'string' && typeof u.role === 'string'
+      );
+      const validGroups = data.groups.every(
+        (g: any) => g && typeof g.groupId === 'string' && typeof g.name === 'string' && typeof g.teacherId === 'string'
+      );
+
+      if (!validUsers || !validGroups) {
+        return { success: false, error: 'بنية سجلات المستخدمين أو المجموعات في النسخة الاحتياطية تالفة أو غير مكتملة' };
       }
 
       this.importServerState(data);
@@ -1838,12 +2221,12 @@ class StorageService {
         userName: 'مستخدم',
         userRole: 'admin',
         action: 'استيراد نسخة احتياطية',
-        details: 'تم استيراد نسخة احتياطية محلية شاملة بنجاح دون أخطاء',
+        details: 'تم التحقق من صحة المخطط واستيراد نسخة احتياطية محلية شاملة بنجاح دون أخطاء',
       });
 
       return { success: true };
     } catch (e) {
-      return { success: false, error: 'حدث خطأ أثناء قراءة ملف النسخة الاحتياطية' };
+      return { success: false, error: 'حدث خطأ أثناء قراءة ملف النسخة الاحتياطية (JSON غير صالح)' };
     }
   }
 
@@ -2003,6 +2386,7 @@ class StorageService {
   }
 
   public deleteMaterial(materialId: string): boolean {
+    syncEngine.addTombstone('materials', materialId);
     const materials = this.getMaterials().filter((m) => m.materialId !== materialId);
     this.set(STORAGE_KEYS.MATERIALS, materials);
     return true;
@@ -2057,6 +2441,7 @@ class StorageService {
   }
 
   public deleteBadge(badgeId: string): boolean {
+    syncEngine.addTombstone('badges', badgeId);
     const badges = this.getBadges().filter((b) => b.badgeId !== badgeId);
     this.set(STORAGE_KEYS.BADGES, badges);
     return true;

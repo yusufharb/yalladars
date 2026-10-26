@@ -33,7 +33,7 @@ export const StudentIDCardModal: React.FC<StudentIDCardModalProps> = ({
   const studentUser = storage.getUserById(studentId);
   const profile = storage.getStudentProfile(studentId);
   const groups = storage.getGroupsForStudent(studentId);
-  const linkingCode = profile?.linkingCode || 'YD-LK-1001';
+  const linkingCode = profile?.linkingCode || '';
 
   // QR payload contains structured data for quick attendance scanning
   const qrPayload = JSON.stringify({

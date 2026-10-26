@@ -21,12 +21,14 @@ import com.yalladars.app.data.model.*
         JoinRequestEntity::class,
         SyncQueueEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class YallaDarsDatabase : RoomDatabase() {
 
     abstract fun groupDao(): GroupDao
+    abstract fun groupMemberDao(): GroupMemberDao
+    abstract fun parentStudentDao(): ParentStudentDao
     abstract fun attendanceDao(): AttendanceDao
     abstract fun homeworkDao(): HomeworkDao
     abstract fun gradeDao(): GradeDao

@@ -32,6 +32,33 @@ interface GroupDao {
 }
 
 @Dao
+interface GroupMemberDao {
+    @Query("SELECT * FROM group_members WHERE groupId = :groupId AND status = 'active'")
+    fun getMembersByGroup(groupId: String): Flow<List<GroupMemberEntity>>
+
+    @Query("SELECT * FROM group_members WHERE studentId = :studentId AND status = 'active'")
+    fun getMembershipsForStudent(studentId: String): Flow<List<GroupMemberEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertMembers(members: List<GroupMemberEntity>)
+
+    @Query("DELETE FROM group_members WHERE groupId = :groupId AND studentId = :studentId")
+    suspend fun deleteMember(groupId: String, studentId: String)
+}
+
+@Dao
+interface ParentStudentDao {
+    @Query("SELECT * FROM parent_students WHERE parentId = :parentId")
+    fun getChildrenForParent(parentId: String): Flow<List<ParentStudentEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertParentStudents(links: List<ParentStudentEntity>)
+
+    @Query("DELETE FROM parent_students WHERE parentId = :parentId AND studentId = :studentId")
+    suspend fun unlinkChild(parentId: String, studentId: String)
+}
+
+@Dao
 interface AttendanceDao {
     @Query("SELECT * FROM attendance WHERE groupId = :groupId AND date = :date")
     fun getAttendanceForGroupDate(groupId: String, date: String): Flow<List<AttendanceEntity>>
