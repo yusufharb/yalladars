@@ -1,0 +1,870 @@
+{
+  "users": [
+    {
+      "id": "user_teacher_1",
+      "name": "أستاذ أحمد حسن",
+      "email": "teacher@yalladars.com",
+      "role": "teacher",
+      "phone": "01012345678",
+      "status": "active",
+      "createdAt": "2026-09-01T10:00:00Z"
+    },
+    {
+      "id": "user_student_1",
+      "name": "محمد أحمد",
+      "email": "student@yalladars.com",
+      "role": "student",
+      "phone": "01123456789",
+      "status": "active",
+      "createdAt": "2026-09-02T11:00:00Z"
+    },
+    {
+      "id": "user_student_youssef",
+      "name": "يوسف حمدي",
+      "email": "youssef@yalladars.com",
+      "role": "student",
+      "phone": "01155443322",
+      "status": "active",
+      "createdAt": "2026-09-10T10:00:00Z"
+    },
+    {
+      "id": "user_student_marwan",
+      "name": "مروان حمدي",
+      "email": "marwan@yalladars.com",
+      "role": "student",
+      "phone": "01199887766",
+      "status": "active",
+      "createdAt": "2026-09-10T10:00:00Z"
+    },
+    {
+      "id": "user_parent_hamdi",
+      "name": "حمدي حرب",
+      "email": "hamdi@yalladars.com",
+      "role": "parent",
+      "phone": "01098765432",
+      "status": "active",
+      "createdAt": "2026-09-10T10:00:00Z"
+    },
+    {
+      "id": "user_parent_1",
+      "name": "أحمد حسن (ولي أمر)",
+      "email": "parent@yalladars.com",
+      "role": "parent",
+      "phone": "01234567890",
+      "status": "active",
+      "createdAt": "2026-09-02T12:00:00Z"
+    },
+    {
+      "id": "user_admin_1",
+      "name": "م/ خالد سامي (إدارة النظام)",
+      "email": "admin@yalladars.com",
+      "role": "admin",
+      "status": "active",
+      "createdAt": "2026-08-01T09:00:00Z"
+    }
+  ],
+  "teachers": [
+    {
+      "teacherId": "user_teacher_1",
+      "subject": "الرياضيات",
+      "grades": [
+        "الصف الأول الثانوي",
+        "الصف الثاني الثانوي"
+      ],
+      "city": "القاهرة - مدينة نصر"
+    }
+  ],
+  "students": [
+    {
+      "studentId": "user_student_1",
+      "grade": "الصف الأول الثانوي",
+      "school": "مدرسة المتفوقين الرسمية",
+      "linkingCode": "YD-LK-1001"
+    },
+    {
+      "studentId": "user_student_youssef",
+      "grade": "الصف الأول الثانوي",
+      "school": "مدرسة المتفوقين الرسمية",
+      "linkingCode": "YD-LK-2001"
+    },
+    {
+      "studentId": "user_student_marwan",
+      "grade": "الصف الثاني الثانوي",
+      "school": "مدرسة المتفوقين الرسمية",
+      "linkingCode": "YD-LK-2002"
+    },
+    {
+      "studentId": "stu_2",
+      "grade": "الصف الأول الثانوي",
+      "school": "مدرسة الأورمان",
+      "linkingCode": "YD-LK-1002"
+    },
+    {
+      "studentId": "stu_3",
+      "grade": "الصف الأول الثانوي",
+      "school": "مدرسة القبة الثانوية",
+      "linkingCode": "YD-LK-1003"
+    },
+    {
+      "studentId": "stu_4",
+      "grade": "الصف الأول الثانوي",
+      "school": "مدرسة طيبة للغات",
+      "linkingCode": "YD-LK-1004"
+    },
+    {
+      "studentId": "stu_5",
+      "grade": "الصف الأول الثانوي",
+      "school": "مدرسة العباسية الثانوية",
+      "linkingCode": "YD-LK-1005"
+    },
+    {
+      "studentId": "stu_6",
+      "grade": "الصف الأول الثانوي",
+      "school": "مدرسة النصر",
+      "linkingCode": "YD-LK-1006"
+    },
+    {
+      "studentId": "stu_7",
+      "grade": "الصف الأول الثانوي",
+      "school": "مدرسة الفاروق",
+      "linkingCode": "YD-LK-1007"
+    },
+    {
+      "studentId": "stu_8",
+      "grade": "الصف الأول الثانوي",
+      "school": "مدرسة الرواد",
+      "linkingCode": "YD-LK-1008"
+    },
+    {
+      "studentId": "stu_9",
+      "grade": "الصف الأول الثانوي",
+      "school": "مدرسة المنار",
+      "linkingCode": "YD-LK-1009"
+    },
+    {
+      "studentId": "stu_10",
+      "grade": "الصف الأول الثانوي",
+      "school": "مدرسة المستقبل",
+      "linkingCode": "YD-LK-1010"
+    }
+  ],
+  "groups": [
+    {
+      "groupId": "group_math_1",
+      "teacherId": "user_teacher_1",
+      "teacherName": "أستاذ أحمد حسن",
+      "name": "رياضيات — أولى ثانوي (مجموعة العباقرة)",
+      "subject": "الرياضيات (جبر وحساب مثلثات)",
+      "grade": "الصف الأول الثانوي",
+      "location": "سنتر الأوائل - مدينة نصر (شارع الطيران)",
+      "days": [
+        "السبت",
+        "الثلاثاء"
+      ],
+      "startTime": "06:00 م",
+      "durationMinutes": 90,
+      "joinCode": "YD-2026",
+      "status": "active",
+      "joinApprovalMode": "auto",
+      "createdAt": "2026-09-05T14:00:00Z"
+    },
+    {
+      "groupId": "group_math_2",
+      "teacherId": "user_teacher_1",
+      "teacherName": "أستاذ أحمد حسن",
+      "name": "رياضيات — ثانية ثانوي علمي",
+      "subject": "الرياضيات البحتة",
+      "grade": "الصف الثاني الثانوي",
+      "location": "سنتر الأوائل - قاعة ب",
+      "days": [
+        "الأحد",
+        "الأربعاء"
+      ],
+      "startTime": "04:30 م",
+      "durationMinutes": 90,
+      "joinCode": "YD-2027",
+      "status": "active",
+      "joinApprovalMode": "requires_approval",
+      "createdAt": "2026-09-06T15:00:00Z"
+    }
+  ],
+  "members": [
+    {
+      "groupId": "group_math_1",
+      "studentId": "stu_2",
+      "studentName": "يوسف مصطفى كامل",
+      "studentGrade": "الصف الأول الثانوي",
+      "joinedAt": "2026-09-06",
+      "status": "active"
+    },
+    {
+      "groupId": "group_math_1",
+      "studentId": "user_student_youssef",
+      "studentName": "يوسف حمدي",
+      "studentGrade": "الصف الأول الثانوي",
+      "joinedAt": "2026-09-10",
+      "status": "active"
+    },
+    {
+      "groupId": "group_math_2",
+      "studentId": "user_student_1",
+      "studentName": "محمد أحمد حسن",
+      "studentGrade": "الصف الثاني الثانوي",
+      "joinedAt": "2026-09-25",
+      "status": "active"
+    },
+    {
+      "groupId": "group_math_1",
+      "studentId": "stu_3",
+      "studentName": "عمر حسام الدين",
+      "studentGrade": "الصف الأول الثانوي",
+      "joinedAt": "2026-09-06",
+      "status": "active"
+    },
+    {
+      "groupId": "group_math_1",
+      "studentId": "stu_4",
+      "studentName": "سارة خالد محمود",
+      "studentGrade": "الصف الأول الثانوي",
+      "joinedAt": "2026-09-06",
+      "status": "active"
+    },
+    {
+      "groupId": "group_math_1",
+      "studentId": "stu_5",
+      "studentName": "كريم عادل فتحي",
+      "studentGrade": "الصف الأول الثانوي",
+      "joinedAt": "2026-09-07",
+      "status": "active"
+    },
+    {
+      "groupId": "group_math_1",
+      "studentId": "stu_6",
+      "studentName": "مريم طارق السيد",
+      "studentGrade": "الصف الأول الثانوي",
+      "joinedAt": "2026-09-07",
+      "status": "active"
+    },
+    {
+      "groupId": "group_math_1",
+      "studentId": "stu_7",
+      "studentName": "إبراهيم سامي عبد الله",
+      "studentGrade": "الصف الأول الثانوي",
+      "joinedAt": "2026-09-07",
+      "status": "active"
+    },
+    {
+      "groupId": "group_math_1",
+      "studentId": "stu_8",
+      "studentName": "نور الدين محمود",
+      "studentGrade": "الصف الأول الثانوي",
+      "joinedAt": "2026-09-08",
+      "status": "active"
+    },
+    {
+      "groupId": "group_math_1",
+      "studentId": "stu_9",
+      "studentName": "زياد ياسر النجار",
+      "studentGrade": "الصف الأول الثانوي",
+      "joinedAt": "2026-09-08",
+      "status": "active"
+    },
+    {
+      "groupId": "group_math_1",
+      "studentId": "stu_10",
+      "studentName": "فاطمة عصام رضوان",
+      "studentGrade": "الصف الأول الثانوي",
+      "joinedAt": "2026-09-08",
+      "status": "active"
+    }
+  ],
+  "parentStudents": [
+    {
+      "parentId": "user_parent_hamdi",
+      "studentId": "user_student_youssef",
+      "studentName": "يوسف حمدي",
+      "grade": "الصف الأول الثانوي",
+      "school": "مدرسة المتفوقين الرسمية",
+      "linkedAt": "2026-09-10",
+      "status": "active"
+    },
+    {
+      "parentId": "user_parent_hamdi",
+      "studentId": "user_student_marwan",
+      "studentName": "مروان حمدي",
+      "grade": "الصف الثاني الثانوي",
+      "school": "مدرسة المتفوقين الرسمية",
+      "linkedAt": "2026-09-10",
+      "status": "active"
+    },
+    {
+      "parentId": "user_parent_1",
+      "studentId": "user_student_1",
+      "studentName": "محمد أحمد حسن",
+      "grade": "الصف الأول الثانوي",
+      "school": "مدرسة المتفوقين الرسمية",
+      "linkedAt": "2026-09-08",
+      "status": "active"
+    }
+  ],
+  "attendance": [
+    {
+      "attendanceId": "att_1",
+      "groupId": "group_math_1",
+      "studentId": "user_student_1",
+      "studentName": "محمد أحمد حسن",
+      "date": "2026-09-24",
+      "status": "present",
+      "createdAt": "2026-09-24T15:00:00Z",
+      "synced": true,
+      "history": []
+    },
+    {
+      "attendanceId": "att_youssef_1",
+      "groupId": "group_math_1",
+      "studentId": "user_student_youssef",
+      "studentName": "يوسف حمدي",
+      "date": "2026-09-24",
+      "status": "present",
+      "createdAt": "2026-09-24T15:00:00Z",
+      "synced": true,
+      "history": []
+    },
+    {
+      "attendanceId": "att_marwan_1",
+      "groupId": "group_math_2",
+      "studentId": "user_student_marwan",
+      "studentName": "مروان حمدي",
+      "date": "2026-09-24",
+      "status": "present",
+      "createdAt": "2026-09-24T15:00:00Z",
+      "synced": true,
+      "history": []
+    },
+    {
+      "attendanceId": "att_2",
+      "groupId": "group_math_1",
+      "studentId": "stu_2",
+      "studentName": "يوسف مصطفى كامل",
+      "date": "2026-09-24",
+      "status": "present",
+      "createdAt": "2026-09-24T15:00:00Z",
+      "synced": true,
+      "history": []
+    },
+    {
+      "attendanceId": "att_3",
+      "groupId": "group_math_1",
+      "studentId": "stu_3",
+      "studentName": "عمر حسام الدين",
+      "date": "2026-09-24",
+      "status": "absent",
+      "createdAt": "2026-09-24T15:00:00Z",
+      "synced": true,
+      "history": []
+    },
+    {
+      "attendanceId": "att_4",
+      "groupId": "group_math_1",
+      "studentId": "stu_4",
+      "studentName": "سارة خالد محمود",
+      "date": "2026-09-24",
+      "status": "present",
+      "createdAt": "2026-09-24T15:00:00Z",
+      "synced": true,
+      "history": []
+    },
+    {
+      "attendanceId": "att_5",
+      "groupId": "group_math_1",
+      "studentId": "stu_5",
+      "studentName": "كريم عادل فتحي",
+      "date": "2026-09-24",
+      "status": "late",
+      "createdAt": "2026-09-24T15:00:00Z",
+      "synced": true,
+      "history": []
+    },
+    {
+      "attendanceId": "att_6",
+      "groupId": "group_math_1",
+      "studentId": "stu_6",
+      "studentName": "مريم طارق السيد",
+      "date": "2026-09-24",
+      "status": "present",
+      "createdAt": "2026-09-24T15:00:00Z",
+      "synced": true,
+      "history": []
+    },
+    {
+      "attendanceId": "att_7",
+      "groupId": "group_math_1",
+      "studentId": "stu_7",
+      "studentName": "إبراهيم سامي عبد الله",
+      "date": "2026-09-24",
+      "status": "present",
+      "createdAt": "2026-09-24T15:00:00Z",
+      "synced": true,
+      "history": []
+    },
+    {
+      "attendanceId": "att_8",
+      "groupId": "group_math_1",
+      "studentId": "stu_8",
+      "studentName": "نور الدين محمود",
+      "date": "2026-09-24",
+      "status": "present",
+      "createdAt": "2026-09-24T15:00:00Z",
+      "synced": true,
+      "history": []
+    },
+    {
+      "attendanceId": "att_9",
+      "groupId": "group_math_1",
+      "studentId": "stu_9",
+      "studentName": "زياد ياسر النجار",
+      "date": "2026-09-24",
+      "status": "present",
+      "createdAt": "2026-09-24T15:00:00Z",
+      "synced": true,
+      "history": []
+    },
+    {
+      "attendanceId": "att_10",
+      "groupId": "group_math_1",
+      "studentId": "stu_10",
+      "studentName": "فاطمة عصام رضوان",
+      "date": "2026-09-24",
+      "status": "present",
+      "createdAt": "2026-09-24T15:00:00Z",
+      "synced": true,
+      "history": []
+    },
+    {
+      "attendanceId": "att_prev_1",
+      "groupId": "group_math_1",
+      "studentId": "user_student_1",
+      "studentName": "محمد أحمد حسن",
+      "date": "2026-09-20",
+      "status": "present",
+      "createdAt": "2026-09-20T15:00:00Z",
+      "synced": true,
+      "history": []
+    },
+    {
+      "attendanceId": "att_prev_2",
+      "groupId": "group_math_1",
+      "studentId": "stu_2",
+      "studentName": "يوسف مصطفى كامل",
+      "date": "2026-09-20",
+      "status": "present",
+      "createdAt": "2026-09-20T15:00:00Z",
+      "synced": true,
+      "history": []
+    },
+    {
+      "attendanceId": "att_prev_3",
+      "groupId": "group_math_1",
+      "studentId": "stu_3",
+      "studentName": "عمر حسام الدين",
+      "date": "2026-09-20",
+      "status": "late",
+      "createdAt": "2026-09-20T15:00:00Z",
+      "synced": true,
+      "history": [
+        {
+          "oldStatus": "absent",
+          "newStatus": "late",
+          "modifiedAt": "2026-09-20T16:30:00Z",
+          "modifiedBy": "أستاذ أحمد حسن"
+        }
+      ]
+    },
+    {
+      "attendanceId": "att_1790302576323_stu_10",
+      "groupId": "group_math_1",
+      "studentId": "stu_10",
+      "studentName": "فاطمة عصام رضوان",
+      "date": "2026-09-25",
+      "status": "absent",
+      "createdAt": "2026-09-25T02:16:16.323Z",
+      "synced": true,
+      "history": []
+    },
+    {
+      "attendanceId": "att_1790302576324_stu_3",
+      "groupId": "group_math_1",
+      "studentId": "stu_3",
+      "studentName": "عمر حسام الدين",
+      "date": "2026-09-25",
+      "status": "absent",
+      "createdAt": "2026-09-25T02:16:16.324Z",
+      "synced": true,
+      "history": []
+    },
+    {
+      "attendanceId": "att_1790302576324_stu_4",
+      "groupId": "group_math_1",
+      "studentId": "stu_4",
+      "studentName": "سارة خالد محمود",
+      "date": "2026-09-25",
+      "status": "present",
+      "createdAt": "2026-09-25T02:16:16.324Z",
+      "synced": true,
+      "history": []
+    },
+    {
+      "attendanceId": "att_1790302576324_stu_5",
+      "groupId": "group_math_1",
+      "studentId": "stu_5",
+      "studentName": "كريم عادل فتحي",
+      "date": "2026-09-25",
+      "status": "present",
+      "createdAt": "2026-09-25T02:16:16.324Z",
+      "synced": true,
+      "history": []
+    },
+    {
+      "attendanceId": "att_1790302576324_stu_6",
+      "groupId": "group_math_1",
+      "studentId": "stu_6",
+      "studentName": "مريم طارق السيد",
+      "date": "2026-09-25",
+      "status": "present",
+      "createdAt": "2026-09-25T02:16:16.324Z",
+      "synced": true,
+      "history": []
+    },
+    {
+      "attendanceId": "att_1790302576324_stu_7",
+      "groupId": "group_math_1",
+      "studentId": "stu_7",
+      "studentName": "إبراهيم سامي عبد الله",
+      "date": "2026-09-25",
+      "status": "present",
+      "createdAt": "2026-09-25T02:16:16.324Z",
+      "synced": true,
+      "history": []
+    },
+    {
+      "attendanceId": "att_1790302576324_stu_8",
+      "groupId": "group_math_1",
+      "studentId": "stu_8",
+      "studentName": "نور الدين محمود",
+      "date": "2026-09-25",
+      "status": "present",
+      "createdAt": "2026-09-25T02:16:16.324Z",
+      "synced": true,
+      "history": []
+    },
+    {
+      "attendanceId": "att_1790302576325_stu_9",
+      "groupId": "group_math_1",
+      "studentId": "stu_9",
+      "studentName": "زياد ياسر النجار",
+      "date": "2026-09-25",
+      "status": "present",
+      "createdAt": "2026-09-25T02:16:16.325Z",
+      "synced": true,
+      "history": []
+    },
+    {
+      "attendanceId": "att_1790302576325_stu_2",
+      "groupId": "group_math_1",
+      "studentId": "stu_2",
+      "studentName": "يوسف مصطفى كامل",
+      "date": "2026-09-25",
+      "status": "late",
+      "createdAt": "2026-09-25T02:16:16.325Z",
+      "synced": true,
+      "history": []
+    }
+  ],
+  "homework": [
+    {
+      "homeworkId": "hw_1",
+      "groupId": "group_math_1",
+      "groupName": "رياضيات — أولى ثانوي",
+      "title": "واجب الجبر: حل تمارين كتاب المعاصر ص ٤٢ إلى ٤٦",
+      "description": "حل مسائل تحديد نوع جذري المعادلة التربيعية ومجموع وحاصل ضرب الجذور. الرجاء الحل بخط واضح في كشكول الواجب.",
+      "assignedDate": "2026-09-24",
+      "dueDate": "2026-09-27",
+      "status": "new",
+      "createdAt": "2026-09-24T16:00:00Z"
+    },
+    {
+      "homeworkId": "hw_2",
+      "groupId": "group_math_1",
+      "groupName": "رياضيات — أولى ثانوي",
+      "title": "واجب الهندسة: تطبيقات التناسب في الدائرة",
+      "description": "حل المسائل من رقم ١ إلى رقم ١٥ في شيت المراجعة المسلم في الحصة.",
+      "assignedDate": "2026-09-22",
+      "dueDate": "2026-09-30",
+      "status": "active",
+      "createdAt": "2026-09-22T14:00:00Z"
+    },
+    {
+      "homeworkId": "hw_3",
+      "groupId": "group_math_1",
+      "groupName": "رياضيات — أولى ثانوي",
+      "title": "واجب حساب المثلثات: الزاوية الموجهة ودائرة الوحدة",
+      "description": "مراجعة وتلخيص قوانين القياس الدائري والستيني مع حل صفحة ٥٨.",
+      "assignedDate": "2026-09-18",
+      "dueDate": "2026-09-22",
+      "status": "closed",
+      "createdAt": "2026-09-18T12:00:00Z"
+    }
+  ],
+  "assessments": [
+    {
+      "assessmentId": "asm_1",
+      "groupId": "group_math_1",
+      "groupName": "رياضيات — أولى ثانوي",
+      "teacherId": "user_teacher_1",
+      "title": "اختبار الوحدة الأولى (جبر)",
+      "subject": "الرياضيات",
+      "date": "2026-09-18",
+      "maxScore": 20,
+      "createdAt": "2026-09-17T10:00:00Z"
+    },
+    {
+      "assessmentId": "asm_2",
+      "groupId": "group_math_1",
+      "groupName": "رياضيات — أولى ثانوي",
+      "teacherId": "user_teacher_1",
+      "title": "كويز سريع: حساب مثلثات",
+      "subject": "الرياضيات",
+      "date": "2026-09-22",
+      "maxScore": 10,
+      "createdAt": "2026-09-21T10:00:00Z"
+    }
+  ],
+  "grades": [
+    {
+      "gradeId": "grade_1",
+      "assessmentId": "asm_1",
+      "groupId": "group_math_1",
+      "groupName": "رياضيات — أولى ثانوي",
+      "studentId": "user_student_1",
+      "studentName": "محمد أحمد حسن",
+      "title": "اختبار الوحدة الأولى (جبر)",
+      "score": 19,
+      "maxScore": 20,
+      "date": "2026-09-18"
+    },
+    {
+      "gradeId": "grade_youssef_1",
+      "assessmentId": "asm_1",
+      "groupId": "group_math_1",
+      "groupName": "رياضيات — أولى ثانوي",
+      "studentId": "user_student_youssef",
+      "studentName": "يوسف حمدي",
+      "title": "اختبار الوحدة الأولى (جبر)",
+      "score": 18.5,
+      "maxScore": 20,
+      "date": "2026-09-18"
+    },
+    {
+      "gradeId": "grade_marwan_1",
+      "assessmentId": "asm_1",
+      "groupId": "group_math_2",
+      "groupName": "رياضيات — ثانية ثانوي علمي",
+      "studentId": "user_student_marwan",
+      "studentName": "مروان حمدي",
+      "title": "اختبار التفاضل وحساب المثلثات",
+      "score": 19,
+      "maxScore": 20,
+      "date": "2026-09-19"
+    },
+    {
+      "gradeId": "grade_2",
+      "assessmentId": "asm_2",
+      "groupId": "group_math_1",
+      "groupName": "رياضيات — أولى ثانوي",
+      "studentId": "user_student_1",
+      "studentName": "محمد أحمد حسن",
+      "title": "كويز سريع: حساب مثلثات",
+      "score": 9.5,
+      "maxScore": 10,
+      "date": "2026-09-22"
+    },
+    {
+      "gradeId": "grade_3",
+      "assessmentId": "asm_1",
+      "groupId": "group_math_1",
+      "groupName": "رياضيات — أولى ثانوي",
+      "studentId": "stu_2",
+      "studentName": "يوسف مصطفى كامل",
+      "title": "اختبار الوحدة الأولى (جبر)",
+      "score": 17,
+      "maxScore": 20,
+      "date": "2026-09-18"
+    },
+    {
+      "gradeId": "grade_4",
+      "assessmentId": "asm_1",
+      "groupId": "group_math_1",
+      "groupName": "رياضيات — أولى ثانوي",
+      "studentId": "stu_3",
+      "studentName": "عمر حسام الدين",
+      "title": "اختبار الوحدة الأولى (جبر)",
+      "score": 14,
+      "maxScore": 20,
+      "date": "2026-09-18"
+    },
+    {
+      "gradeId": "grade_5",
+      "assessmentId": "asm_1",
+      "groupId": "group_math_1",
+      "groupName": "رياضيات — أولى ثانوي",
+      "studentId": "stu_4",
+      "studentName": "سارة خالد محمود",
+      "title": "اختبار الوحدة الأولى (جبر)",
+      "score": 20,
+      "maxScore": 20,
+      "date": "2026-09-18"
+    }
+  ],
+  "announcements": [
+    {
+      "announcementId": "ann_1",
+      "groupId": "group_math_1",
+      "groupName": "رياضيات — أولى ثانوي",
+      "teacherName": "أستاذ أحمد حسن",
+      "title": "تعديل موعد كويز الجبر ومراجعة إضافية",
+      "body": "أبنائي وبناتي الطلاب، الحصة القادمة يوم الثلاثاء ستبدأ في تمام الساعة ٦:٠٠ م بدون أي تأخير، وسنخصص أول ٢٠ دقيقة لحل استفساراتكم قبل بدء الكويز.",
+      "createdAt": "2026-09-24T12:30:00Z"
+    },
+    {
+      "announcementId": "ann_2",
+      "groupId": "group_math_1",
+      "groupName": "رياضيات — أولى ثانوي",
+      "teacherName": "أستاذ أحمد حسن",
+      "title": "تسليم مذكرة المراجعة المجانية للمنصة",
+      "body": "تم تجهيز مذكرة مراجعة شاملة للوحدة الأولى من حساب المثلثات ومتاحة للاستلام في السنتر.",
+      "createdAt": "2026-09-19T10:00:00Z"
+    }
+  ],
+  "notes": [
+    {
+      "noteId": "note_1",
+      "teacherId": "user_teacher_1",
+      "studentId": "user_student_1",
+      "studentName": "محمد أحمد حسن",
+      "text": "محمد ما شاء الله عليه طالب متميز، يشارك بفعالية في الحصة ودرجاته ممتازة. يُرجى فقط الاستمرار في مراجعة واجبات الهندسة بانتظام.",
+      "visibility": "parent_visible",
+      "createdAt": "2026-09-22T18:00:00Z"
+    },
+    {
+      "noteId": "note_youssef_1",
+      "teacherId": "user_teacher_1",
+      "studentId": "user_student_youssef",
+      "studentName": "يوسف حمدي",
+      "text": "يوسف طالب مجتهد ومهذب جداً، مستواه ممتاز في حل تمارين الجبر ومتابع بانتظام.",
+      "visibility": "parent_visible",
+      "createdAt": "2026-09-23T17:00:00Z"
+    },
+    {
+      "noteId": "note_marwan_1",
+      "teacherId": "user_teacher_1",
+      "studentId": "user_student_marwan",
+      "studentName": "مروان حمدي",
+      "text": "مروان متفوق في مادة التفاضل، تفكيره الرياضي راقٍ ويجيب على المسائل الصعبة بدقة.",
+      "visibility": "parent_visible",
+      "createdAt": "2026-09-23T17:30:00Z"
+    },
+    {
+      "noteId": "note_2",
+      "teacherId": "user_teacher_1",
+      "studentId": "user_student_1",
+      "studentName": "محمد أحمد حسن",
+      "text": "ملاحظة خاصة بالمدرس: يحتاج تشجيع في براهين تشابه المثلثات وتدريبه على حل مسائل التفكير العليا في الامتحان النهائي.",
+      "visibility": "teacher_only",
+      "createdAt": "2026-09-22T18:05:00Z"
+    }
+  ],
+  "notifications": [
+    {
+      "notificationId": "notif_1",
+      "userId": "user_student_1",
+      "title": "واجب جديد في الرياضيات",
+      "body": "أضاف الأستاذ أحمد واجب جديد لمجموعة أولى ثانوي، موعد التسليم ٢٧ سبتمبر.",
+      "type": "homework",
+      "read": false,
+      "createdAt": "2026-09-24T16:05:00Z"
+    },
+    {
+      "notificationId": "notif_2",
+      "userId": "user_student_1",
+      "title": "تسجيل درجة الاختبار",
+      "body": "حصلت على 19 من 20 في اختبار الوحدة الأولى (جبر). ممتاز!",
+      "type": "grade",
+      "read": true,
+      "createdAt": "2026-09-18T19:00:00Z"
+    },
+    {
+      "notificationId": "notif_3",
+      "userId": "user_parent_1",
+      "title": "حضور الحصة اليوم",
+      "body": "تم تسجيل حضور ابنك (محمد) في حصة الرياضيات اليوم.",
+      "type": "attendance",
+      "read": false,
+      "createdAt": "2026-09-24T15:10:00Z"
+    },
+    {
+      "notificationId": "notif_4",
+      "userId": "user_teacher_1",
+      "title": "طلب انضمام جديد",
+      "body": "طلب الطالب (محمد أحمد) الانضمام لمجموعة ثانية ثانوي علمي.",
+      "type": "request",
+      "read": false,
+      "createdAt": "2026-09-24T14:35:00Z"
+    },
+    {
+      "notificationId": "notif_1790300489298_0.6891636644711095",
+      "userId": "user_student_1",
+      "title": "تم قبول طلب الانضمام",
+      "body": "وافق المدرس على طلب انضمامك إلى مجموعة: رياضيات — ثانية ثانوي علمي",
+      "type": "session",
+      "read": false,
+      "createdAt": "2026-09-25T01:41:29.298Z"
+    }
+  ],
+  "joinRequests": [
+    {
+      "requestId": "req_1",
+      "groupId": "group_math_2",
+      "groupName": "رياضيات — ثانية ثانوي علمي",
+      "teacherId": "user_teacher_1",
+      "studentId": "user_student_1",
+      "studentName": "محمد أحمد حسن",
+      "studentGrade": "الصف الثاني الثانوي",
+      "status": "accepted",
+      "requestedAt": "2026-09-24T14:30:00Z"
+    }
+  ],
+  "auditLogs": [
+    {
+      "id": "audit_1",
+      "userId": "user_teacher_1",
+      "userName": "أستاذ أحمد حسن",
+      "userRole": "teacher",
+      "action": "تعديل حضور سابق",
+      "details": "تم تعديل حالة الطالب عمر حسام الدين من غائب إلى متأخر لحصة 20 سبتمبر 2026",
+      "timestamp": "2026-09-20T16:30:00Z"
+    }
+  ],
+  "reports": [
+    {
+      "id": "rep_1",
+      "userId": "user_teacher_1",
+      "userName": "أستاذ أحمد حسن",
+      "userRole": "teacher",
+      "title": "طلب إضافة تصدير كشوف الحضور بصيغة PDF",
+      "description": "نرجو إضافة زر لطباعة تقرير الحضور الشهري للطلاب في السنتر.",
+      "date": "2026-09-20",
+      "status": "pending"
+    }
+  ],
+  "lastModified": 1790303134727
+}

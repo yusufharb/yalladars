@@ -1,0 +1,100 @@
+import React, { useState } from 'react';
+import { useAuth } from '../../context/AuthContext';
+import { storage } from '../../services/storage';
+import { Users, X, ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react';
+
+interface LinkChildModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess: (childName: string) => void;
+}
+
+export const LinkChildModal: React.FC<LinkChildModalProps> = ({
+  isOpen,
+  onClose,
+  onSuccess,
+}) => {
+  const { currentUser } = useAuth();
+  const [code, setCode] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  if (!isOpen) return null;
+
+  const handleLink = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!code.trim() || !currentUser) return;
+
+    setError(null);
+    setLoading(true);
+
+    const res = storage.linkChildByCode(currentUser.id, code);
+    setLoading(false);
+
+    if (res.success && res.studentName) {
+      onSuccess(res.studentName);
+      onClose();
+      setCode('');
+    } else {
+      setError(res.error || 'كود الطالب غير صحيح');
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-fade-in">
+      <div className="relative w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl text-slate-800">
+        <button
+          onClick={onClose}
+          className="absolute left-4 top-4 p-1 text-slate-400 hover:text-slate-600 rounded-full"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
+        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-teal-50 text-teal-700">
+          <Users className="h-6 w-6" />
+        </div>
+
+        <h3 className="text-base font-bold text-slate-900 text-center">ربط حساب الابن</h3>
+        <p className="mt-1 text-xs text-slate-500 text-center">
+          أدخل كود ربط الابن (Student Linking Code) الخاص بحساب ابنك
+        </p>
+
+        {error && (
+          <div className="mt-3 flex items-center gap-2 rounded-xl bg-rose-50 p-2 text-xs text-rose-700 border border-rose-200">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleLink} className="mt-4 space-y-3">
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">
+              كود ربط الطالب (Linking Code)
+            </label>
+            <input
+              type="text"
+              required
+              placeholder="مثال: STU-1002"
+              value={code}
+              onChange={(e) => setCode(e.target.value.toUpperCase())}
+              className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-center font-mono text-base font-bold uppercase tracking-wider text-teal-900 focus:border-teal-600 focus:outline-none"
+            />
+          </div>
+
+          <div className="rounded-xl bg-slate-50 p-2.5 text-[11px] text-slate-500 border border-slate-100">
+            💡 تجربة سريعة لربط طالب آخر: جرب استخدام كود الطالب التجريبي الثاني: <strong className="font-mono text-teal-800">STU-1002</strong> (يوسف مصطفى)
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-teal-700 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-teal-800 transition active:scale-95 disabled:opacity-50"
+          >
+            <ArrowRight className="w-4 h-4" />
+            <span>ربط الابن ومتابعة درجاته</span>
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+};
