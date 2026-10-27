@@ -18,6 +18,7 @@ export const AdminDashboard: React.FC = () => {
   useStorageUpdate();
   const { currentUser } = useAuth();
   const [refreshKey, setRefreshKey] = useState(0);
+  const [confirmReset, setConfirmReset] = useState(false);
 
   const rawUsers = storage.getUsers() || [];
   const users: User[] = (Array.isArray(rawUsers) ? rawUsers.flat(Infinity) : [])
@@ -38,10 +39,9 @@ export const AdminDashboard: React.FC = () => {
   };
 
   const handleResetDemoData = () => {
-    if (window.confirm('هل أنت متأكد من إعادة ضبط البيانات التجريبية الافتراضية؟')) {
-      storage.resetToDefaultDemo();
-      setRefreshKey((k) => k + 1);
-    }
+    storage.resetToDefaultDemo();
+    setConfirmReset(false);
+    setRefreshKey((k) => k + 1);
   };
 
   return (
@@ -56,14 +56,31 @@ export const AdminDashboard: React.FC = () => {
             <p className="text-xs text-slate-500">مسار محمي لإدارة مستخدمي ومجموعات التطبيق</p>
           </div>
         </div>
-        <button
-          onClick={handleResetDemoData}
-          className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-bold text-slate-700 hover:bg-slate-100 transition"
-          title="إعادة تعيين البيانات للوضع الافتراضي"
-        >
-          <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
-          <span>إعادة ضبط الديمو</span>
-        </button>
+        {!confirmReset ? (
+          <button
+            onClick={() => setConfirmReset(true)}
+            className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-bold text-slate-700 hover:bg-slate-100 transition"
+            title="إعادة تعيين البيانات للوضع الافتراضي"
+          >
+            <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+            <span>إعادة ضبط الديمو</span>
+          </button>
+        ) : (
+          <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-xl text-[11px]">
+            <button
+              onClick={handleResetDemoData}
+              className="bg-amber-600 text-white font-bold px-2 py-0.5 rounded-lg"
+            >
+              تأكيد الضبط
+            </button>
+            <button
+              onClick={() => setConfirmReset(false)}
+              className="text-slate-600 font-bold px-1.5 py-0.5"
+            >
+              إلغاء
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Stats overview */}

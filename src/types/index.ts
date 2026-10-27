@@ -111,7 +111,43 @@ export interface Homework {
   assignedDate: string; // YYYY-MM-DD
   dueDate: string; // YYYY-MM-DD
   status: HomeworkStatus;
+  maxScore?: number;
   createdAt: string;
+}
+
+export type HomeworkSubmissionStatus = 'submitted' | 'late' | 'graded';
+
+export interface HomeworkSubmission {
+  submissionId: string;
+  homeworkId: string;
+  groupId: string;
+  groupName: string;
+  studentId: string;
+  studentName: string;
+  answerText: string;
+  attachmentUrl?: string;
+  status: HomeworkSubmissionStatus;
+  submittedAt: string;
+  score?: number;
+  maxScore?: number;
+  teacherFeedback?: string;
+  gradedAt?: string;
+  gradedBy?: string;
+}
+
+export interface AssistantPermissions {
+  permissionId: string; // `${teacherId}_${assistantId}`
+  teacherId: string;
+  assistantId: string;
+  assistantName: string;
+  assistantEmail?: string;
+  allowedGroupIds: string[];
+  canRecordAttendance: boolean;
+  canSearchStudents: boolean;
+  canManagePayments: boolean;
+  canManageJoinRequests: boolean;
+  canManageHomework: boolean;
+  updatedAt: string;
 }
 
 export interface Assessment {

@@ -50,6 +50,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
   const [printModalOpen, setPrintModalOpen] = useState(false);
   const [selectedCert, setSelectedCert] = useState<StudentCertificate | null>(null);
   const [whatsAppModalOpen, setWhatsAppModalOpen] = useState(false);
+  const [confirmUnlinkId, setConfirmUnlinkId] = useState<string | null>(null);
 
   React.useEffect(() => {
     if (linkedChildren.length > 0 && !linkedChildren.some((c) => c.studentId === selectedStudentId)) {
@@ -63,6 +64,9 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
   const childGroups = selectedStudentId ? storage.getGroupsForStudent(selectedStudentId) : [];
   const childAttendance = selectedStudentId ? storage.getAttendanceForStudent(selectedStudentId) : [];
   const childHomework = selectedStudentId ? storage.getHomeworkForStudent(selectedStudentId) : [];
+  const childHwSubmissions = selectedStudentId
+    ? storage.getHomeworkSubmissionsForStudent(selectedStudentId)
+    : [];
   const childGrades = selectedStudentId ? storage.getGradesForStudent(selectedStudentId) : [];
   const childNotes = selectedStudentId ? storage.getNotesForParent(selectedStudentId) : [];
   const weeklySummary = selectedStudentId ? storage.getParentWeeklySummary(selectedStudentId) : null;
@@ -80,13 +84,12 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
   const latestGrade = childGrades[0];
   const latestAttendance = childAttendance[0];
 
-  const handleUnlink = (childName: string, studentId: string) => {
-    if (window.confirm(`هل أنت متأكد من إلغاء ربط حساب الابن (${childName})؟`)) {
-      storage.unlinkChild(parentId, studentId);
-      if (linkedChildren.length > 1) {
-        const remaining = linkedChildren.filter((c) => c.studentId !== studentId);
-        setSelectedStudentId(remaining[0].studentId);
-      }
+  const handleConfirmUnlink = (studentId: string) => {
+    storage.unlinkChild(parentId, studentId);
+    setConfirmUnlinkId(null);
+    if (linkedChildren.length > 1) {
+      const remaining = linkedChildren.filter((c) => c.studentId !== studentId);
+      setSelectedStudentId(remaining[0].studentId);
     }
   };
 
@@ -151,7 +154,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
         </div>
       ) : (
         <>
-          {/* Weekly Summary Card (Requirement #10) */}
+          {/* Weekly Summary Card */}
           {weeklySummary && (
             <div className="rounded-2xl border border-teal-200/90 bg-teal-50/80 p-4 shadow-2xs space-y-2">
               <div className="flex items-center justify-between">
@@ -159,14 +162,32 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                   <BarChart2 className="w-4 h-4 text-teal-700" />
                   <span>الملخص الأسبوعي للابن ({selectedChild?.studentName}):</span>
                 </div>
-                <button
-                  onClick={() => selectedChild && handleUnlink(selectedChild.studentName, selectedChild.studentId)}
-                  className="text-[10px] text-slate-400 hover:text-rose-600 transition flex items-center gap-0.5"
-                  title="إلغاء ربط الحساب"
-                >
-                  <Trash2 className="w-3 h-3" />
-                  <span>إلغاء الربط</span>
-                </button>
+                {selectedChild && confirmUnlinkId !== selectedChild.studentId ? (
+                  <button
+                    onClick={() => setConfirmUnlinkId(selectedChild.studentId)}
+                    className="text-[10px] text-slate-400 hover:text-rose-600 transition flex items-center gap-0.5"
+                    title="إلغاء ربط الحساب"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                    <span>إلغاء الربط</span>
+                  </button>
+                ) : selectedChild ? (
+                  <div className="flex items-center gap-1 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-lg text-[10px]">
+                    <span className="text-rose-800 font-bold">تأكيد إلغاء الربط؟</span>
+                    <button
+                      onClick={() => handleConfirmUnlink(selectedChild.studentId)}
+                      className="bg-rose-600 text-white px-2 py-0.5 rounded font-bold"
+                    >
+                      نعم
+                    </button>
+                    <button
+                      onClick={() => setConfirmUnlinkId(null)}
+                      className="text-slate-600 px-1.5 py-0.5 font-bold"
+                    >
+                      تراجع
+                    </button>
+                  </div>
+                ) : null}
               </div>
 
               <div className="grid grid-cols-3 gap-2 text-center text-xs pt-1">
@@ -418,9 +439,64 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
             </div>
           )}
 
+          {/* Child Homework & Submissions Tracking Section */}
+          <div className="space-y-2">
+            <h3 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+              <BookOpen className="w-4 h-4 text-blue-600" />
+              <span>متابعة تسليم الواجبات ودرجاتها ({childHomework.length}):</span>
+            </h3>
+            {childHomework.length === 0 ? (
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 text-center text-xs text-slate-400">
+                لا توجد واجبات مسجلة حالياً
+              </div>
+            ) : (
+              childHomework.map((hw) => {
+                const sub = childHwSubmissions.find((s) => s.homeworkId === hw.homeworkId);
+                const maxScore = hw.maxScore || 10;
+                return (
+                  <div
+                    key={hw.homeworkId}
+                    className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-2xs space-y-1.5 text-xs"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <div className="font-bold text-slate-900">{hw.title}</div>
+                        <div className="text-[10px] text-slate-400 mt-0.5">
+                          {hw.groupName} · موعد التسليم: {hw.dueDate}
+                        </div>
+                      </div>
+                      {sub?.status === 'graded' ? (
+                        <span className="text-[11px] font-black text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-xl dir-ltr shrink-0">
+                          {sub.score} / {sub.maxScore || maxScore} 🌟
+                        </span>
+                      ) : sub?.status === 'late' ? (
+                        <span className="text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full shrink-0">
+                          تم التسليم متأخراً
+                        </span>
+                      ) : sub ? (
+                        <span className="text-[10px] font-bold text-teal-800 bg-teal-50 border border-teal-200 px-2 py-0.5 rounded-full shrink-0">
+                          تم التسليم ✓
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full shrink-0">
+                          لم يسلّم بعد
+                        </span>
+                      )}
+                    </div>
+                    {sub?.teacherFeedback && (
+                      <div className="rounded-xl bg-teal-50/70 border border-teal-100 p-2 text-[11px] text-teal-900">
+                        <strong>تعليق المدرس:</strong> {sub.teacherFeedback}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+
           {/* Recent Grades List */}
           <div className="space-y-2">
-            <h3 className="text-xs font-bold text-slate-800">درجات الاختبارات</h3>
+            <h3 className="text-xs font-bold text-slate-800">سجل الدرجات والتقييمات</h3>
             {childGrades.length === 0 ? (
               <div className="rounded-2xl border border-slate-200 bg-white p-4 text-center text-xs text-slate-400">
                 لم تسجل درجات حتى الآن

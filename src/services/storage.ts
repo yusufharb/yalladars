@@ -31,7 +31,9 @@ import {
   MaterialType,
   BadgeType,
   LiveSession,
-  LiveClassPlatform
+  LiveClassPlatform,
+  HomeworkSubmission,
+  AssistantPermissions
 } from '../types';
 import {
   INITIAL_USERS,
@@ -56,7 +58,9 @@ import {
   INITIAL_QUIZZES,
   INITIAL_QUIZ_SUBMISSIONS,
   INITIAL_CERTIFICATES,
-  INITIAL_LIVE_SESSIONS
+  INITIAL_LIVE_SESSIONS,
+  INITIAL_HOMEWORK_SUBMISSIONS,
+  INITIAL_ASSISTANT_PERMISSIONS
 } from '../data/mockInitialData';
 import { syncEngine } from './syncEngine';
 
@@ -87,6 +91,8 @@ const STORAGE_KEYS = {
   QUIZ_SUBMISSIONS: 'yd_quiz_submissions_v2',
   CERTIFICATES: 'yd_certificates_v2',
   LIVE_SESSIONS: 'yd_live_sessions_v2',
+  HOMEWORK_SUBMISSIONS: 'yd_homework_submissions_v2',
+  ASSISTANT_PERMISSIONS: 'yd_assistant_permissions_v2',
 };
 
 class StorageService {
@@ -144,6 +150,8 @@ class StorageService {
       quizSubmissions: this.getQuizSubmissions(),
       certificates: this.getCertificates(),
       liveSessions: this.getLiveSessions(),
+      homeworkSubmissions: this.getHomeworkSubmissions(),
+      assistantPermissions: this.getAssistantPermissions(),
       tombstones: syncEngine.getTombstones(),
     };
   }
@@ -197,6 +205,10 @@ class StorageService {
         return String(item.certificateId || '');
       case 'liveSessions':
         return String(item.sessionId || '');
+      case 'homeworkSubmissions':
+        return String(item.submissionId || (item.homeworkId && item.studentId ? `hwsub_${item.homeworkId}_${item.studentId}` : ''));
+      case 'assistantPermissions':
+        return String(item.permissionId || (item.teacherId && item.assistantId ? `${item.teacherId}_${item.assistantId}` : ''));
       default:
         return String(item.id || '');
     }
@@ -332,6 +344,20 @@ class StorageService {
     if (Array.isArray(serverState.liveSessions)) {
       this.set(STORAGE_KEYS.LIVE_SESSIONS, mergeWithPendingUpserts(serverState.liveSessions, 'liveSessions', (s) => s.sessionId), false);
     }
+    if (Array.isArray(serverState.homeworkSubmissions)) {
+      this.set(
+        STORAGE_KEYS.HOMEWORK_SUBMISSIONS,
+        mergeWithPendingUpserts(serverState.homeworkSubmissions, 'homeworkSubmissions', (s) => s.submissionId || `hwsub_${s.homeworkId}_${s.studentId}`),
+        false
+      );
+    }
+    if (Array.isArray(serverState.assistantPermissions)) {
+      this.set(
+        STORAGE_KEYS.ASSISTANT_PERMISSIONS,
+        mergeWithPendingUpserts(serverState.assistantPermissions, 'assistantPermissions', (p) => p.permissionId || `${p.teacherId}_${p.assistantId}`),
+        false
+      );
+    }
     this.repairParentStudentLinks(false);
     this.notify();
   }
@@ -364,6 +390,8 @@ class StorageService {
       localStorage.setItem(STORAGE_KEYS.QUIZ_SUBMISSIONS, JSON.stringify(INITIAL_QUIZ_SUBMISSIONS));
       localStorage.setItem(STORAGE_KEYS.CERTIFICATES, JSON.stringify(INITIAL_CERTIFICATES));
       localStorage.setItem(STORAGE_KEYS.LIVE_SESSIONS, JSON.stringify(INITIAL_LIVE_SESSIONS));
+      localStorage.setItem(STORAGE_KEYS.HOMEWORK_SUBMISSIONS, JSON.stringify(INITIAL_HOMEWORK_SUBMISSIONS));
+      localStorage.setItem(STORAGE_KEYS.ASSISTANT_PERMISSIONS, JSON.stringify(INITIAL_ASSISTANT_PERMISSIONS));
       localStorage.setItem(
         STORAGE_KEYS.REMINDER_SETTING,
         JSON.stringify({ enabled: true, minutesBefore: 30 })
@@ -371,6 +399,12 @@ class StorageService {
       localStorage.setItem(STORAGE_KEYS.INITIALIZED, 'true');
       this.notify();
     } else {
+      if (!localStorage.getItem(STORAGE_KEYS.HOMEWORK_SUBMISSIONS)) {
+        localStorage.setItem(STORAGE_KEYS.HOMEWORK_SUBMISSIONS, JSON.stringify(INITIAL_HOMEWORK_SUBMISSIONS));
+      }
+      if (!localStorage.getItem(STORAGE_KEYS.ASSISTANT_PERMISSIONS)) {
+        localStorage.setItem(STORAGE_KEYS.ASSISTANT_PERMISSIONS, JSON.stringify(INITIAL_ASSISTANT_PERMISSIONS));
+      }
       // Clean any legacy nested arrays in localStorage without re-injecting unfiltered seed data
       try {
         const storedUsers = localStorage.getItem(STORAGE_KEYS.USERS);
@@ -531,6 +565,8 @@ class StorageService {
       [STORAGE_KEYS.QUIZ_SUBMISSIONS]: 'quizSubmissions',
       [STORAGE_KEYS.CERTIFICATES]: 'certificates',
       [STORAGE_KEYS.LIVE_SESSIONS]: 'liveSessions',
+      [STORAGE_KEYS.HOMEWORK_SUBMISSIONS]: 'homeworkSubmissions',
+      [STORAGE_KEYS.ASSISTANT_PERMISSIONS]: 'assistantPermissions',
     };
 
     const entityType = keyMap[key];
@@ -684,6 +720,24 @@ class StorageService {
         linkingCode: generatedLinkingCode,
       });
       this.set(STORAGE_KEYS.STUDENTS, students);
+    } else if (params.role === 'assistant') {
+      const perms = this.get<AssistantPermissions[]>(STORAGE_KEYS.ASSISTANT_PERMISSIONS, []);
+      const defaultTeacherId = 'user_teacher_1';
+      perms.push({
+        permissionId: `${defaultTeacherId}_${newId}`,
+        teacherId: defaultTeacherId,
+        assistantId: newId,
+        assistantName: newUser.name,
+        assistantEmail: newUser.email,
+        allowedGroupIds: this.getGroupsByTeacher(defaultTeacherId).map((g) => g.groupId),
+        canRecordAttendance: true,
+        canSearchStudents: true,
+        canManagePayments: false,
+        canManageJoinRequests: false,
+        canManageHomework: false,
+        updatedAt: new Date().toISOString(),
+      });
+      this.set(STORAGE_KEYS.ASSISTANT_PERMISSIONS, perms);
     }
 
     this.setCurrentUser(newUser);
@@ -886,6 +940,159 @@ class StorageService {
     target.joinApprovalMode = mode;
     this.set(STORAGE_KEYS.GROUPS, groups);
     return true;
+  }
+
+  public regenerateGroupJoinCode(groupId: string): { success: boolean; newCode?: string; error?: string } {
+    const groups = this.getGroups();
+    const target = groups.find((g) => g.groupId === groupId);
+    if (!target) return { success: false, error: 'المجموعة غير موجودة' };
+
+    let newCode = `YD-${Math.floor(1000 + Math.random() * 9000)}`;
+    while (groups.some((g) => g.joinCode === newCode)) {
+      newCode = `YD-${Math.floor(1000 + Math.random() * 9000)}`;
+    }
+
+    const oldCode = target.joinCode;
+    target.joinCode = newCode;
+    this.set(STORAGE_KEYS.GROUPS, groups);
+
+    const curr = this.getCurrentUser();
+    this.addAuditLog({
+      userId: curr?.id || target.teacherId,
+      userName: curr?.name || target.teacherName,
+      userRole: 'teacher',
+      action: 'تغيير كود انضمام المجموعة',
+      details: `تم تغيير كود المجموعة (${target.name}) من ${oldCode} إلى ${newCode}`,
+    });
+
+    return { success: true, newCode };
+  }
+
+  public deleteGroup(groupId: string): { success: boolean; error?: string } {
+    const groups = this.getGroups();
+    const target = groups.find((g) => g.groupId === groupId);
+    if (!target) return { success: false, error: 'المجموعة غير موجودة' };
+
+    const curr = this.getCurrentUser();
+    syncEngine.addTombstone('groups', groupId, curr?.id);
+    const filtered = groups.filter((g) => g.groupId !== groupId);
+    this.set(STORAGE_KEYS.GROUPS, filtered);
+
+    this.addAuditLog({
+      userId: curr?.id || target.teacherId,
+      userName: curr?.name || target.teacherName,
+      userRole: 'teacher',
+      action: 'حذف مجموعة',
+      details: `تم حذف المجموعة (${target.name}) نهائياً`,
+    });
+
+    return { success: true };
+  }
+
+  public updateGroup(groupId: string, updates: Partial<Group>): { success: boolean; group?: Group; error?: string } {
+    const groups = this.getGroups();
+    const target = groups.find((g) => g.groupId === groupId);
+    if (!target) return { success: false, error: 'المجموعة غير موجودة' };
+    Object.assign(target, updates);
+    this.set(STORAGE_KEYS.GROUPS, groups);
+    return { success: true, group: target };
+  }
+
+  // --- Assistant Permissions Management ---
+  public getAssistantPermissions(): AssistantPermissions[] {
+    return this.get<AssistantPermissions[]>(STORAGE_KEYS.ASSISTANT_PERMISSIONS, []);
+  }
+
+  public getAssistantPermissionsForTeacher(teacherId: string): AssistantPermissions[] {
+    const allPerms = this.getAssistantPermissions();
+    const assistantUsers = this.getUsers().filter((u) => u.role === 'assistant' && u.status === 'active');
+    const teacherGroups = this.getGroupsByTeacher(teacherId).map((g) => g.groupId);
+
+    const result: AssistantPermissions[] = [];
+    for (const assistant of assistantUsers) {
+      const existing = allPerms.find(
+        (p) => p.teacherId === teacherId && p.assistantId === assistant.id
+      );
+      if (existing) {
+        result.push({
+          ...existing,
+          assistantName: assistant.name,
+          assistantEmail: assistant.email,
+        });
+      } else {
+        result.push({
+          permissionId: `${teacherId}_${assistant.id}`,
+          teacherId,
+          assistantId: assistant.id,
+          assistantName: assistant.name,
+          assistantEmail: assistant.email,
+          allowedGroupIds: teacherGroups,
+          canRecordAttendance: true,
+          canSearchStudents: true,
+          canManagePayments: false,
+          canManageJoinRequests: false,
+          canManageHomework: false,
+          updatedAt: new Date().toISOString(),
+        });
+      }
+    }
+    return result;
+  }
+
+  public getEffectiveAssistantPermissions(assistantId: string, teacherId = 'user_teacher_1'): AssistantPermissions {
+    const allPerms = this.getAssistantPermissions();
+    const existing =
+      allPerms.find((p) => p.assistantId === assistantId && p.teacherId === teacherId) ||
+      allPerms.find((p) => p.assistantId === assistantId);
+    if (existing) return existing;
+
+    const assistantUser = this.getUserById(assistantId);
+    return {
+      permissionId: `${teacherId}_${assistantId}`,
+      teacherId,
+      assistantId,
+      assistantName: assistantUser?.name || 'مساعد المدرس',
+      assistantEmail: assistantUser?.email,
+      allowedGroupIds: this.getGroupsByTeacher(teacherId).map((g) => g.groupId),
+      canRecordAttendance: true,
+      canSearchStudents: true,
+      canManagePayments: false,
+      canManageJoinRequests: false,
+      canManageHomework: false,
+      updatedAt: new Date().toISOString(),
+    };
+  }
+
+  public saveAssistantPermissions(
+    params: Omit<AssistantPermissions, 'permissionId' | 'updatedAt'>
+  ): AssistantPermissions {
+    const allPerms = this.getAssistantPermissions();
+    const permissionId = `${params.teacherId}_${params.assistantId}`;
+    const updatedRecord: AssistantPermissions = {
+      ...params,
+      permissionId,
+      updatedAt: new Date().toISOString(),
+    };
+
+    const idx = allPerms.findIndex((p) => p.permissionId === permissionId);
+    if (idx >= 0) {
+      allPerms[idx] = updatedRecord;
+    } else {
+      allPerms.push(updatedRecord);
+    }
+
+    this.set(STORAGE_KEYS.ASSISTANT_PERMISSIONS, allPerms);
+
+    const curr = this.getCurrentUser();
+    this.addAuditLog({
+      userId: curr?.id || params.teacherId,
+      userName: curr?.name || 'المدرس',
+      userRole: 'teacher',
+      action: 'تحديث صلاحيات المساعد',
+      details: `تم تحديث صلاحيات المساعد (${params.assistantName}) — الحضور: ${params.canRecordAttendance ? 'نعم' : 'لا'}، المصروفات: ${params.canManagePayments ? 'نعم' : 'لا'}، الطلبات: ${params.canManageJoinRequests ? 'نعم' : 'لا'}، الواجبات: ${params.canManageHomework ? 'نعم' : 'لا'}`,
+    });
+
+    return updatedRecord;
   }
 
   // --- Members / Join Code & Approval Flow ---
@@ -1577,6 +1784,7 @@ class StorageService {
     description: string;
     dueDate: string;
     assignedDate?: string;
+    maxScore?: number;
   }): { success: boolean; homework?: Homework; error?: string } {
     if (!params.title.trim()) return { success: false, error: 'عنوان الواجب مطلوب' };
     if (!params.dueDate) return { success: false, error: 'تاريخ التسليم مطلوب' };
@@ -1591,6 +1799,7 @@ class StorageService {
       assignedDate: params.assignedDate || new Date().toISOString().split('T')[0],
       dueDate: params.dueDate,
       status: 'new',
+      maxScore: params.maxScore || 10,
       createdAt: new Date().toISOString(),
     };
 
@@ -1629,6 +1838,210 @@ class StorageService {
     });
 
     return { success: true, newStatus };
+  }
+
+  // --- Homework Submissions & Instant Grading ---
+  public getHomeworkSubmissions(): HomeworkSubmission[] {
+    return this.get<HomeworkSubmission[]>(STORAGE_KEYS.HOMEWORK_SUBMISSIONS, []);
+  }
+
+  public getHomeworkSubmissionsByHomework(homeworkId: string): HomeworkSubmission[] {
+    return this.getHomeworkSubmissions().filter((s) => s.homeworkId === homeworkId);
+  }
+
+  public getHomeworkSubmissionsForStudent(studentId: string): HomeworkSubmission[] {
+    return this.getHomeworkSubmissions().filter((s) => s.studentId === studentId);
+  }
+
+  public submitHomework(params: {
+    homeworkId: string;
+    studentId: string;
+    studentName: string;
+    answerText: string;
+    attachmentUrl?: string;
+  }): { success: boolean; submission?: HomeworkSubmission; error?: string } {
+    if (!params.answerText.trim()) {
+      return { success: false, error: 'يرجى كتابة حل الواجب أو ملاحظة التسليم' };
+    }
+
+    const hw = this.getHomework().find((h) => h.homeworkId === params.homeworkId);
+    if (!hw) {
+      return { success: false, error: 'الواجب غير موجود' };
+    }
+    if (hw.status === 'closed') {
+      return { success: false, error: 'هذا الواجب مغلق ولا يقبل تسليمات جديدة' };
+    }
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const isLate = Boolean(hw.dueDate && todayStr > hw.dueDate);
+    const submissions = this.getHomeworkSubmissions();
+    const submissionId = `hwsub_${params.homeworkId}_${params.studentId}`;
+    const existingIdx = submissions.findIndex(
+      (s) => s.submissionId === submissionId || (s.homeworkId === params.homeworkId && s.studentId === params.studentId)
+    );
+
+    const newSub: HomeworkSubmission = {
+      submissionId,
+      homeworkId: params.homeworkId,
+      groupId: hw.groupId,
+      groupName: hw.groupName,
+      studentId: params.studentId,
+      studentName: params.studentName,
+      answerText: params.answerText.trim(),
+      attachmentUrl: params.attachmentUrl?.trim() || undefined,
+      status: existingIdx >= 0 && submissions[existingIdx].status === 'graded'
+        ? 'graded'
+        : isLate
+        ? 'late'
+        : 'submitted',
+      submittedAt: new Date().toISOString(),
+      score: existingIdx >= 0 ? submissions[existingIdx].score : undefined,
+      maxScore: existingIdx >= 0 ? submissions[existingIdx].maxScore : hw.maxScore || 10,
+      teacherFeedback: existingIdx >= 0 ? submissions[existingIdx].teacherFeedback : undefined,
+      gradedAt: existingIdx >= 0 ? submissions[existingIdx].gradedAt : undefined,
+      gradedBy: existingIdx >= 0 ? submissions[existingIdx].gradedBy : undefined,
+    };
+
+    if (existingIdx >= 0) {
+      submissions[existingIdx] = newSub;
+    } else {
+      submissions.unshift(newSub);
+    }
+
+    this.set(STORAGE_KEYS.HOMEWORK_SUBMISSIONS, submissions);
+
+    // Notify group teacher
+    const group = this.getGroupById(hw.groupId);
+    if (group) {
+      this.addNotification({
+        userId: group.teacherId,
+        title: `تسليم واجب: ${params.studentName}`,
+        body: `قام الطالب (${params.studentName}) بتسليم واجب (${hw.title})${isLate ? ' (متأخر)' : ''}`,
+        type: 'homework',
+      });
+    }
+
+    // Notify linked parents immediately
+    const parentLinks = this.getParentStudents().filter(
+      (ps) => ps.studentId === params.studentId && ps.status === 'active'
+    );
+    parentLinks.forEach((pl) => {
+      this.addNotification({
+        userId: pl.parentId,
+        title: `تسليم واجب للابن (${params.studentName})`,
+        body: `قام ${params.studentName} بتسليم واجب (${hw.title}) في مجموعة ${hw.groupName}.`,
+        type: 'homework',
+      });
+    });
+
+    return { success: true, submission: newSub };
+  }
+
+  public gradeHomeworkSubmission(params: {
+    homeworkId: string;
+    studentId: string;
+    studentName: string;
+    score: number;
+    maxScore: number;
+    teacherFeedback?: string;
+    gradedBy?: string;
+  }): { success: boolean; submission?: HomeworkSubmission; grade?: GradeRecord; error?: string } {
+    const hw = this.getHomework().find((h) => h.homeworkId === params.homeworkId);
+    if (!hw) return { success: false, error: 'الواجب غير موجود' };
+
+    if (params.score < 0 || params.maxScore <= 0 || params.score > params.maxScore) {
+      return { success: false, error: `الدرجة يجب أن تكون بين 0 و ${params.maxScore}` };
+    }
+
+    const submissions = this.getHomeworkSubmissions();
+    const submissionId = `hwsub_${params.homeworkId}_${params.studentId}`;
+    const idx = submissions.findIndex(
+      (s) => s.submissionId === submissionId || (s.homeworkId === params.homeworkId && s.studentId === params.studentId)
+    );
+
+    const nowIso = new Date().toISOString();
+    let updatedSub: HomeworkSubmission;
+
+    if (idx >= 0) {
+      updatedSub = {
+        ...submissions[idx],
+        submissionId,
+        status: 'graded',
+        score: params.score,
+        maxScore: params.maxScore,
+        teacherFeedback: params.teacherFeedback?.trim() || undefined,
+        gradedAt: nowIso,
+        gradedBy: params.gradedBy || 'المدرس',
+      };
+      submissions[idx] = updatedSub;
+    } else {
+      updatedSub = {
+        submissionId,
+        homeworkId: params.homeworkId,
+        groupId: hw.groupId,
+        groupName: hw.groupName,
+        studentId: params.studentId,
+        studentName: params.studentName,
+        answerText: 'تم تسليم الواجب ورقياً في الحصة',
+        status: 'graded',
+        submittedAt: nowIso,
+        score: params.score,
+        maxScore: params.maxScore,
+        teacherFeedback: params.teacherFeedback?.trim() || undefined,
+        gradedAt: nowIso,
+        gradedBy: params.gradedBy || 'المدرس',
+      };
+      submissions.unshift(updatedSub);
+    }
+
+    this.set(STORAGE_KEYS.HOMEWORK_SUBMISSIONS, submissions);
+
+    // Immediately create/update GradeRecord so it appears in StudentGrades & ParentDashboard immediately
+    const allGrades = this.getGrades();
+    const gradeId = `grade_hw_${params.homeworkId}_${params.studentId}`;
+    const gradeTitle = `واجب: ${hw.title}`;
+    const gradeIdx = allGrades.findIndex((g) => g.gradeId === gradeId);
+    const gradeRec: GradeRecord = {
+      gradeId,
+      groupId: hw.groupId,
+      groupName: hw.groupName,
+      studentId: params.studentId,
+      studentName: params.studentName,
+      title: gradeTitle,
+      score: params.score,
+      maxScore: params.maxScore,
+      date: nowIso.split('T')[0],
+    };
+
+    if (gradeIdx >= 0) {
+      allGrades[gradeIdx] = gradeRec;
+    } else {
+      allGrades.unshift(gradeRec);
+    }
+    this.set(STORAGE_KEYS.GRADES, allGrades);
+
+    // Notify student immediately
+    this.addNotification({
+      userId: params.studentId,
+      title: `تم تصحيح الواجب: ${hw.title}`,
+      body: `حصلت على ${params.score} من ${params.maxScore} في واجب (${hw.title})${params.teacherFeedback ? ` — ملاحظة المدرس: ${params.teacherFeedback}` : ''}`,
+      type: 'grade',
+    });
+
+    // Notify linked parents immediately
+    const parentLinks = this.getParentStudents().filter(
+      (ps) => ps.studentId === params.studentId && ps.status === 'active'
+    );
+    parentLinks.forEach((pl) => {
+      this.addNotification({
+        userId: pl.parentId,
+        title: `درجة واجب للابن (${params.studentName})`,
+        body: `حصل ${params.studentName} على ${params.score} من ${params.maxScore} في واجب (${hw.title})${params.teacherFeedback ? ` — ملاحظة المدرس: ${params.teacherFeedback}` : ''}`,
+        type: 'grade',
+      });
+    });
+
+    return { success: true, submission: updatedSub, grade: gradeRec };
   }
 
   // --- Assessments & Batch Grades (V2 Concept) ---
@@ -2471,9 +2884,10 @@ class StorageService {
     submission: QuizSubmission;
   } {
     const submissions = this.getQuizSubmissions();
+    const submissionId = `sub_${params.quizId}_${params.studentId}`;
     const newSub: QuizSubmission = {
       ...params,
-      submissionId: `sub_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      submissionId,
       submittedAt: new Date().toISOString(),
     };
     // Replace if already submitted or unshift
@@ -2486,6 +2900,43 @@ class StorageService {
       submissions.unshift(newSub);
     }
     this.set(STORAGE_KEYS.QUIZ_SUBMISSIONS, submissions);
+
+    const quiz = this.getQuizById(params.quizId);
+    if (quiz) {
+      const allGrades = this.getGrades();
+      const gradeId = `grade_quiz_${params.quizId}_${params.studentId}`;
+      const gradeIdx = allGrades.findIndex((g) => g.gradeId === gradeId);
+      const gradeRec: GradeRecord = {
+        gradeId,
+        groupId: quiz.groupId,
+        groupName: quiz.groupName,
+        studentId: params.studentId,
+        studentName: params.studentName,
+        title: `كويز تفاعلي: ${quiz.title}`,
+        score: params.score,
+        maxScore: params.totalQuestions,
+        date: new Date().toISOString().split('T')[0],
+      };
+      if (gradeIdx >= 0) {
+        allGrades[gradeIdx] = gradeRec;
+      } else {
+        allGrades.unshift(gradeRec);
+      }
+      this.set(STORAGE_KEYS.GRADES, allGrades);
+
+      const parentLinks = this.getParentStudents().filter(
+        (ps) => ps.studentId === params.studentId && ps.status === 'active'
+      );
+      parentLinks.forEach((pl) => {
+        this.addNotification({
+          userId: pl.parentId,
+          title: `نتيجة كويز فوري للابن (${params.studentName})`,
+          body: `حصل ${params.studentName} على ${params.score} من ${params.totalQuestions} في الكويز التفاعلي (${quiz.title}).`,
+          type: 'grade',
+        });
+      });
+    }
+
     return { success: true, submission: newSub };
   }
 

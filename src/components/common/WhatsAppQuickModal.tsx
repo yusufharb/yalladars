@@ -36,6 +36,7 @@ export const WhatsAppQuickModal: React.FC<WhatsAppQuickModalProps> = ({
   const [selectedTemplate, setSelectedTemplate] = useState<string>(contextType);
   const [customMessage, setCustomMessage] = useState<string>('');
   const [copied, setCopied] = useState(false);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
 
   React.useEffect(() => {
     if (defaultPhone) setPhone(defaultPhone);
@@ -88,15 +89,7 @@ export const WhatsAppQuickModal: React.FC<WhatsAppQuickModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleSend = () => {
-    if (!phone) {
-      alert('برجاء كتابة رقم الهاتف أولاً');
-      return;
-    }
-    const url = storage.formatWhatsAppUrl(phone, customMessage);
-    window.open(url, '_blank');
-    onClose();
-  };
+  const waHref = phone.trim() ? storage.formatWhatsAppUrl(phone.trim(), customMessage) : '#';
 
   const handleCopy = () => {
     navigator.clipboard.writeText(customMessage);
@@ -252,16 +245,35 @@ export const WhatsAppQuickModal: React.FC<WhatsAppQuickModalProps> = ({
           />
         </div>
 
+        {phoneError && (
+          <div className="mt-2 rounded-xl bg-rose-50 border border-rose-200 p-2 text-[11px] font-bold text-rose-700">
+            {phoneError}
+          </div>
+        )}
+
         {/* Actions */}
         <div className="mt-4 flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleSend}
-            className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 text-xs font-bold shadow-md transition active:scale-98"
-          >
-            <Send className="w-3.5 h-3.5" />
-            <span>فتح المحادثة في واتساب</span>
-          </button>
+          {phone.trim() ? (
+            <a
+              href={waHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => onClose()}
+              className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 text-xs font-bold shadow-md transition active:scale-98"
+            >
+              <Send className="w-3.5 h-3.5" />
+              <span>فتح المحادثة في واتساب</span>
+            </a>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setPhoneError('برجاء كتابة رقم الهاتف أولاً')}
+              className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 text-xs font-bold shadow-md transition active:scale-98"
+            >
+              <Send className="w-3.5 h-3.5" />
+              <span>فتح المحادثة في واتساب</span>
+            </button>
+          )}
           <button
             type="button"
             onClick={onClose}

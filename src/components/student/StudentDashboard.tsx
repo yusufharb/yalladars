@@ -49,6 +49,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
 
   const [copiedCode, setCopiedCode] = useState(false);
   const [regeneratedMsg, setRegeneratedMsg] = useState(false);
+  const [confirmRegenerate, setConfirmRegenerate] = useState(false);
 
   // Modals state
   const [activeQuiz, setActiveQuiz] = useState<PracticeQuiz | null>(null);
@@ -89,11 +90,10 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
   };
 
   const handleRegenerateCode = () => {
-    if (window.confirm('هل تريد إلغاء كود الربط الحالي وتوليد كود جديد؟ ستحتاج لإعطاء الكود الجديد لوالدك.')) {
-      storage.regenerateStudentLinkingCode(studentId);
-      setRegeneratedMsg(true);
-      setTimeout(() => setRegeneratedMsg(false), 3000);
-    }
+    storage.regenerateStudentLinkingCode(studentId);
+    setConfirmRegenerate(false);
+    setRegeneratedMsg(true);
+    setTimeout(() => setRegeneratedMsg(false), 3000);
   };
 
   return (
@@ -433,13 +433,30 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
             {copiedCode ? <Check className="w-3.5 h-3.5 text-teal-600" /> : <Copy className="w-3.5 h-3.5" />}
             <span>{copiedCode ? 'تم' : 'نسخ'}</span>
           </button>
-          <button
-            onClick={handleRegenerateCode}
-            className="p-1.5 rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-100 transition"
-            title="توليد كود ربط جديد"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-          </button>
+          {!confirmRegenerate ? (
+            <button
+              onClick={() => setConfirmRegenerate(true)}
+              className="p-1.5 rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-100 transition"
+              title="توليد كود ربط جديد"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+            </button>
+          ) : (
+            <div className="flex items-center gap-1 bg-amber-50 border border-amber-200 px-2 py-1 rounded-xl text-[10px]">
+              <button
+                onClick={handleRegenerateCode}
+                className="bg-amber-600 text-white font-bold px-2 py-0.5 rounded-lg"
+              >
+                تأكيد التجديد
+              </button>
+              <button
+                onClick={() => setConfirmRegenerate(false)}
+                className="text-slate-600 font-bold px-1.5 py-0.5"
+              >
+                إلغاء
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

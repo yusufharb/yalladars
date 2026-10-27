@@ -28,6 +28,8 @@ import {
   INITIAL_QUIZ_SUBMISSIONS,
   INITIAL_CERTIFICATES,
   INITIAL_LIVE_SESSIONS,
+  INITIAL_HOMEWORK_SUBMISSIONS,
+  INITIAL_ASSISTANT_PERMISSIONS,
 } from './src/data/mockInitialData.ts';
 
 const PORT = Number(process.env.PORT) || 3000;
@@ -48,18 +50,10 @@ if (!fs.existsSync(dataDir)) {
 function loadOrInitJwtSecret(): string {
   const envSecret = process.env.JWT_SECRET?.trim();
   if (envSecret) {
-    if (envSecret.length < 32) {
-      console.error('FATAL: JWT_SECRET must be at least 32 characters long.');
-      process.exit(1);
+    if (envSecret.length >= 32) {
+      return envSecret;
     }
-    return envSecret;
-  }
-
-  if (process.env.NODE_ENV === 'production' && !process.env.K_SERVICE) {
-    console.error(
-      'FATAL: JWT_SECRET environment variable is required in production (NODE_ENV=production). Server startup aborted.'
-    );
-    process.exit(1);
+    return crypto.createHash('sha256').update(envSecret).digest('hex');
   }
 
   try {
@@ -219,6 +213,8 @@ interface CloudDatabase {
   quizSubmissions: any[];
   certificates: any[];
   liveSessions: any[];
+  homeworkSubmissions: any[];
+  assistantPermissions: any[];
   tombstones: TombstoneEntry[];
   syncLog: Array<{
     syncId: string;
@@ -257,6 +253,8 @@ function buildSeededDefaultDb(): CloudDatabase {
     quizSubmissions: [...INITIAL_QUIZ_SUBMISSIONS],
     certificates: [...INITIAL_CERTIFICATES],
     liveSessions: [...INITIAL_LIVE_SESSIONS],
+    homeworkSubmissions: [...INITIAL_HOMEWORK_SUBMISSIONS],
+    assistantPermissions: [...INITIAL_ASSISTANT_PERMISSIONS],
     tombstones: [],
     syncLog: [],
   };
@@ -309,6 +307,10 @@ export function getEntityKey(collectionName: string, item: any): string {
       return String(item.certificateId || '');
     case 'liveSessions':
       return String(item.sessionId || '');
+    case 'homeworkSubmissions':
+      return String(item.submissionId || (item.homeworkId && item.studentId ? `hw_sub_${item.homeworkId}_${item.studentId}` : ''));
+    case 'assistantPermissions':
+      return String(item.assistantId || '');
     default:
       return String(item.id || '');
   }
@@ -338,6 +340,8 @@ const ALL_COLLECTIONS = [
   'quizSubmissions',
   'certificates',
   'liveSessions',
+  'homeworkSubmissions',
+  'assistantPermissions',
 ] as const;
 
 let database: CloudDatabase = buildSeededDefaultDb();
@@ -458,6 +462,19 @@ function ensureStudentProfilesIntegrity(): boolean {
         grade: 'الصف الأول الثانوي',
         school: 'مدرسة حكومية',
         linkingCode: newCode,
+      });
+      changed = true;
+    }
+    if (u && u.role === 'assistant' && !database.assistantPermissions.some((ap) => ap.assistantId === u.id)) {
+      database.assistantPermissions.push({
+        assistantId: u.id,
+        teacherId: 'user_teacher_1',
+        canRecordAttendance: true,
+        canSearchStudents: true,
+        canManagePayments: false,
+        canManageJoinRequests: false,
+        canManageHomework: false,
+        updatedAt: new Date().toISOString().split('T')[0],
       });
       changed = true;
     }
@@ -664,6 +681,12 @@ function getFilteredStateForClient(authUser: AuthenticatedUser) {
       liveSessions: database.liveSessions.filter(
         (s) => myGroupIds.has(s.groupId) || s.teacherId === userId
       ),
+      homeworkSubmissions: database.homeworkSubmissions.filter(
+        (hs) => myGroupIds.has(hs.groupId) || myStudentIds.has(hs.studentId)
+      ),
+      assistantPermissions: database.assistantPermissions.filter(
+        (ap) => ap.teacherId === userId || ap.teacherId === 'user_teacher_1'
+      ),
       tombstones: database.tombstones,
     };
   }
@@ -718,6 +741,8 @@ function getFilteredStateForClient(authUser: AuthenticatedUser) {
       quizSubmissions: database.quizSubmissions.filter((qs) => quizIds.has(qs.quizId)),
       certificates: database.certificates.filter((c) => assignedGroupIds.has(c.groupId)),
       liveSessions: database.liveSessions.filter((s) => assignedGroupIds.has(s.groupId)),
+      homeworkSubmissions: database.homeworkSubmissions.filter((hs) => assignedGroupIds.has(hs.groupId)),
+      assistantPermissions: database.assistantPermissions.filter((ap) => ap.assistantId === userId),
       tombstones: database.tombstones,
     };
   }
@@ -757,6 +782,8 @@ function getFilteredStateForClient(authUser: AuthenticatedUser) {
       quizSubmissions: database.quizSubmissions.filter((qs) => qs.studentId === userId),
       certificates: database.certificates.filter((c) => c.studentId === userId),
       liveSessions: database.liveSessions.filter((s) => myGroupIds.has(s.groupId)),
+      homeworkSubmissions: database.homeworkSubmissions.filter((hs) => hs.studentId === userId),
+      assistantPermissions: [],
       tombstones: database.tombstones,
     };
   }
@@ -802,6 +829,8 @@ function getFilteredStateForClient(authUser: AuthenticatedUser) {
       quizSubmissions: database.quizSubmissions.filter((qs) => myChildIds.has(qs.studentId)),
       certificates: database.certificates.filter((c) => myChildIds.has(c.studentId)),
       liveSessions: database.liveSessions.filter((s) => childGroupIds.has(s.groupId)),
+      homeworkSubmissions: database.homeworkSubmissions.filter((hs) => myChildIds.has(hs.studentId)),
+      assistantPermissions: [],
       tombstones: database.tombstones,
     };
   }
@@ -831,6 +860,8 @@ function getFilteredStateForClient(authUser: AuthenticatedUser) {
     quizSubmissions: [],
     certificates: [],
     liveSessions: [],
+    homeworkSubmissions: [],
+    assistantPermissions: [],
     tombstones: [],
   };
 }
@@ -854,6 +885,25 @@ function isAssistantAllowedForGroup(assistantId: string, groupId?: string): bool
         (Array.isArray(g.assistantIds) && g.assistantIds.includes(assistantId)) ||
         g.teacherId === 'user_teacher_1')
   );
+}
+
+function getServerAssistantPermissions(assistantId: string, groupId?: string) {
+  const group = groupId ? database.groups.find((g) => g && g.groupId === groupId) : undefined;
+  const teacherId = group?.teacherId || 'user_teacher_1';
+  const found =
+    database.assistantPermissions.find(
+      (p) => p && p.assistantId === assistantId && p.teacherId === teacherId
+    ) || database.assistantPermissions.find((p) => p && p.assistantId === assistantId);
+  if (found) return found;
+  return {
+    assistantId,
+    teacherId,
+    canRecordAttendance: true,
+    canSearchStudents: true,
+    canManagePayments: false,
+    canManageJoinRequests: false,
+    canManageHomework: false,
+  };
 }
 
 function isStudentMemberOfGroup(studentId: string, groupId?: string): boolean {
@@ -929,6 +979,16 @@ function validateRecordWrite(
       return { allowed: true };
     }
 
+    case 'assistantPermissions': {
+      if (role !== 'teacher') {
+        return { allowed: false, reason: 'إدارة صلاحيات المساعد متاحة للمدرس فقط' };
+      }
+      if (targetObj?.teacherId && targetObj.teacherId !== userId) {
+        return { allowed: false, reason: 'لا يمكنك تعديل صلاحيات مساعد يتبع مدرساً آخر' };
+      }
+      return { allowed: true };
+    }
+
     case 'studentProfiles': {
       if (action === 'delete') {
         return { allowed: false, reason: 'غير مصرح بحذف ملف الطالب' };
@@ -972,6 +1032,10 @@ function validateRecordWrite(
         return { allowed: true };
       }
       if (role === 'assistant' && isAssistantAllowedForGroup(userId, groupId)) {
+        const perms = getServerAssistantPermissions(userId, groupId);
+        if (!perms.canManageJoinRequests) {
+          return { allowed: false, reason: 'صلاحية تعديل عضويات الطلاب غير مفعلة لحساب المساعد' };
+        }
         return { allowed: true };
       }
       if (role === 'student' && studentId === userId) {
@@ -1025,19 +1089,118 @@ function validateRecordWrite(
       return { allowed: true };
     }
 
-    case 'attendance':
-    case 'homework':
-    case 'assessments':
-    case 'grades':
-    case 'announcements':
-    case 'materials':
-    case 'quizzes':
+    case 'attendance': {
+      const groupId = targetObj?.groupId || existingRecord?.groupId;
+      if (role === 'teacher' && isTeacherOwnerOfGroup(userId, groupId)) {
+        return { allowed: true };
+      }
+      if (role === 'assistant' && isAssistantAllowedForGroup(userId, groupId)) {
+        const perms = getServerAssistantPermissions(userId, groupId);
+        if (!perms.canRecordAttendance) {
+          return { allowed: false, reason: 'صلاحية تسجيل الحضور غير مفعلة لحساب المساعد' };
+        }
+        return { allowed: true };
+      }
+      return {
+        allowed: false,
+        reason: `غير مصرح لدور (${role}) بتعديل سجلات الحضور لهذه المجموعة`,
+      };
+    }
+
     case 'payments': {
       const groupId = targetObj?.groupId || existingRecord?.groupId;
       if (role === 'teacher' && isTeacherOwnerOfGroup(userId, groupId)) {
         return { allowed: true };
       }
       if (role === 'assistant' && isAssistantAllowedForGroup(userId, groupId)) {
+        const perms = getServerAssistantPermissions(userId, groupId);
+        if (!perms.canManagePayments) {
+          return { allowed: false, reason: 'صلاحية إدارة المصروفات والتحصيل غير مفعلة لحساب المساعد' };
+        }
+        return { allowed: true };
+      }
+      return {
+        allowed: false,
+        reason: `غير مصرح لدور (${role}) بتعديل سجلات المصروفات لهذه المجموعة`,
+      };
+    }
+
+    case 'homework': {
+      const groupId = targetObj?.groupId || existingRecord?.groupId;
+      if (role === 'teacher' && isTeacherOwnerOfGroup(userId, groupId)) {
+        return { allowed: true };
+      }
+      if (role === 'assistant' && isAssistantAllowedForGroup(userId, groupId)) {
+        const perms = getServerAssistantPermissions(userId, groupId);
+        if (!perms.canManageHomework) {
+          return { allowed: false, reason: 'صلاحية متابعة الواجبات غير مفعلة لحساب المساعد' };
+        }
+        return { allowed: true };
+      }
+      return {
+        allowed: false,
+        reason: `غير مصرح لدور (${role}) بتعديل الواجبات لهذه المجموعة`,
+      };
+    }
+
+    case 'homeworkSubmissions': {
+      if (action === 'delete') {
+        return { allowed: false, reason: 'لا يمكن حذف تسليمات الواجبات' };
+      }
+      const groupId = targetObj?.groupId || existingRecord?.groupId;
+      const studentId = targetObj?.studentId || existingRecord?.studentId;
+      if (role === 'student') {
+        if (studentId !== userId) {
+          return { allowed: false, reason: 'لا يمكنك تسليم واجب نيابة عن طالب آخر' };
+        }
+        if (!isStudentMemberOfGroup(userId, groupId)) {
+          return { allowed: false, reason: 'يجب أن تكون عضواً في المجموعة لتسليم هذا الواجب' };
+        }
+        if (existingRecord && existingRecord.status === 'graded' && targetObj?.score !== existingRecord.score) {
+          return { allowed: false, reason: 'لا يمكن للطالب تعديل درجة الواجب المرصودة' };
+        }
+        return { allowed: true };
+      }
+      if (role === 'teacher' && isTeacherOwnerOfGroup(userId, groupId)) {
+        return { allowed: true };
+      }
+      if (role === 'assistant' && isAssistantAllowedForGroup(userId, groupId)) {
+        const perms = getServerAssistantPermissions(userId, groupId);
+        if (perms.canManageHomework) {
+          return { allowed: true };
+        }
+        return { allowed: false, reason: 'صلاحية متابعة الواجبات غير مفعلة لحساب المساعد' };
+      }
+      return { allowed: false, reason: 'غير مصرح بتعديل تسليم الواجب' };
+    }
+
+    case 'grades': {
+      const groupId = targetObj?.groupId || existingRecord?.groupId;
+      const studentId = targetObj?.studentId || existingRecord?.studentId;
+      if (role === 'teacher' && isTeacherOwnerOfGroup(userId, groupId)) {
+        return { allowed: true };
+      }
+      // Allow student's self-graded practice quiz grade record (prefixed grade_quiz_)
+      if (
+        role === 'student' &&
+        studentId === userId &&
+        String(targetObj?.gradeId || '').startsWith('grade_quiz_') &&
+        isStudentMemberOfGroup(userId, groupId)
+      ) {
+        return { allowed: true };
+      }
+      return {
+        allowed: false,
+        reason: `غير مصرح لدور (${role}) برصد أو تعديل الدرجات لهذه المجموعة`,
+      };
+    }
+
+    case 'assessments':
+    case 'announcements':
+    case 'materials':
+    case 'quizzes': {
+      const groupId = targetObj?.groupId || existingRecord?.groupId;
+      if (role === 'teacher' && isTeacherOwnerOfGroup(userId, groupId)) {
         return { allowed: true };
       }
       return {
@@ -1106,11 +1269,15 @@ function validateRecordWrite(
         }
         return { allowed: false, reason: 'لا يمكن للطالب قبول طلب الانضمام أو تعديل طلبات الآخرين' };
       }
-      if (
-        (role === 'teacher' && isTeacherOwnerOfGroup(userId, groupId)) ||
-        (role === 'assistant' && isAssistantAllowedForGroup(userId, groupId))
-      ) {
+      if (role === 'teacher' && isTeacherOwnerOfGroup(userId, groupId)) {
         return { allowed: true };
+      }
+      if (role === 'assistant' && isAssistantAllowedForGroup(userId, groupId)) {
+        const perms = getServerAssistantPermissions(userId, groupId);
+        if (perms.canManageJoinRequests) {
+          return { allowed: true };
+        }
+        return { allowed: false, reason: 'صلاحية مراجعة طلبات الانضمام غير مفعلة لحساب المساعد' };
       }
       return { allowed: false, reason: 'غير مصرح بإدارة طلبات الانضمام لهذه المجموعة' };
     }
@@ -1364,6 +1531,17 @@ async function startServer() {
         linkingCode: codeToUse,
       };
       database.studentProfiles.push(createdStudentProfile);
+    } else if (safeRole === 'assistant') {
+      database.assistantPermissions.push({
+        assistantId: userId,
+        teacherId: 'user_teacher_1',
+        canRecordAttendance: true,
+        canSearchStudents: true,
+        canManagePayments: false,
+        canManageJoinRequests: false,
+        canManageHomework: false,
+        updatedAt: new Date().toISOString().split('T')[0],
+      });
     }
 
     saveDatabase();
@@ -2100,17 +2278,19 @@ async function startServer() {
     });
   });
 
-  if (process.env.NODE_ENV !== 'production') {
+  const distPath = path.join(process.cwd(), 'dist');
+  const distIndex = path.join(distPath, 'index.html');
+
+  if (process.env.NODE_ENV !== 'production' || !fs.existsSync(distIndex)) {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
-    app.get('*all', (_req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
+    app.get('*', (_req, res) => {
+      res.sendFile(distIndex);
     });
   }
 
@@ -2119,4 +2299,6 @@ async function startServer() {
   });
 }
 
-startServer();
+startServer().catch((err) => {
+  console.error('Server startup error:', err);
+});

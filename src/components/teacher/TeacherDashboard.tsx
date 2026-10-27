@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { storage } from '../../services/storage';
 import { useStorageUpdate } from '../../hooks/useStorageUpdate';
@@ -18,7 +18,9 @@ import {
   Bell,
   CheckSquare,
   FileSpreadsheet,
-  Video
+  Video,
+  ShieldCheck,
+  Settings
 } from 'lucide-react';
 import { Group } from '../../types';
 
@@ -42,6 +44,9 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   const { currentUser } = useAuth();
   const teacherId = currentUser?.id || 'user_teacher_1';
 
+  const [showAssistantPermsModal, setShowAssistantPermsModal] = useState(false);
+  const [permSaveBanner, setPermSaveBanner] = useState<string | null>(null);
+
   // Live session check
   const activeLiveSession = storage.getActiveLiveSession();
 
@@ -53,9 +58,17 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
 
   const homeworkList = storage.getHomework().filter((h) => teacherGroupIds.includes(h.groupId));
   const activeHomework = homeworkList.filter((h) => h.status !== 'closed');
+  const allHwSubmissions = storage
+    .getHomeworkSubmissions()
+    .filter((s) => teacherGroupIds.includes(s.groupId));
+  const pendingHwGrading = allHwSubmissions.filter(
+    (s) => s.status === 'submitted' || s.status === 'late'
+  );
 
   const pendingRequests = storage.getPendingJoinRequestsForTeacher(teacherId);
   const conflicts = storage.detectTeacherScheduleConflicts(teacherId);
+
+  const assistants = storage.getUsers().filter((u) => u.role === 'assistant');
 
   const today = new Date().toISOString().split('T')[0];
   const todayAttendance = storage.getAttendance().filter(
@@ -67,6 +80,28 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   const lateCount = todayAttendance.filter((a) => a.status === 'late').length;
 
   const nextGroup = activeGroups[0] || groups[0];
+
+  const handleToggleAssistantPerm = (
+    assistantId: string,
+    key: 'canRecordAttendance' | 'canSearchStudents' | 'canManagePayments' | 'canManageJoinRequests' | 'canManageHomework'
+  ) => {
+    const current = storage.getEffectiveAssistantPermissions(assistantId, teacherId);
+    storage.saveAssistantPermissions({
+      teacherId,
+      assistantId,
+      assistantName: current.assistantName,
+      assistantEmail: current.assistantEmail,
+      allowedGroupIds: current.allowedGroupIds,
+      canRecordAttendance: current.canRecordAttendance,
+      canSearchStudents: current.canSearchStudents,
+      canManagePayments: current.canManagePayments,
+      canManageJoinRequests: current.canManageJoinRequests,
+      canManageHomework: current.canManageHomework,
+      [key]: !current[key],
+    });
+    setPermSaveBanner('تم حفظ وتحديث صلاحيات المساعد فوراً');
+    setTimeout(() => setPermSaveBanner(null), 2500);
+  };
 
   return (
     <div className="space-y-4 pb-20">
@@ -140,8 +175,8 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         </div>
       )}
 
-      {/* Important Alerts & Notifications Box (Requirement #1) */}
-      {(pendingRequests.length > 0 || absentCount > 0 || activeHomework.length > 0) && (
+      {/* Important Alerts & Notifications Box */}
+      {(pendingRequests.length > 0 || absentCount > 0 || activeHomework.length > 0 || pendingHwGrading.length > 0) && (
         <div className="rounded-2xl border border-amber-200/90 bg-amber-50/80 p-3.5 text-xs text-amber-950 space-y-2 shadow-2xs">
           <div className="flex items-center gap-1.5 font-bold text-amber-900">
             <Bell className="w-4 h-4 text-amber-700" />
@@ -155,6 +190,15 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
               >
                 <span>🔔 لديك {pendingRequests.length} طلبات انضمام جديدة بانتظار موافقتك</span>
                 <span className="text-amber-800 font-bold underline">مراجعة</span>
+              </div>
+            )}
+            {pendingHwGrading.length > 0 && (
+              <div
+                onClick={() => onNavigateToGroup(pendingHwGrading[0].groupId, 'homework')}
+                className="flex items-center justify-between bg-white/80 p-2 rounded-xl border border-amber-200 cursor-pointer hover:bg-white transition"
+              >
+                <span>📥 يوجد {pendingHwGrading.length} تسليمات واجبات من الطلاب جاهزة للتصحيح</span>
+                <span className="text-teal-800 font-bold underline">تصحيح الآن</span>
               </div>
             )}
             {absentCount > 0 && (
@@ -218,7 +262,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         </div>
       )}
 
-      {/* Quick Action Shortcuts (Requirement #1) */}
+      {/* Quick Action Shortcuts */}
       <div className="space-y-1.5">
         <h3 className="text-xs font-bold text-slate-700 px-1">الإجراءات السريعة</h3>
         <div className="grid grid-cols-4 gap-2 text-center text-xs">
@@ -271,6 +315,29 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         </div>
       </div>
 
+      {/* Assistant Permissions Control Card */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs flex items-center justify-between">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="p-2.5 rounded-xl bg-teal-50 text-teal-800 border border-teal-200 shrink-0">
+            <ShieldCheck className="w-5 h-5" />
+          </div>
+          <div className="min-w-0">
+            <div className="font-bold text-xs text-slate-900">إدارة صلاحيات المساعد / السكرتارية</div>
+            <p className="text-[11px] text-slate-500 mt-0.5 truncate">
+              افتراضياً: الحضور والبحث فقط · خصص صلاحية المصروفات والطلبات
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => setShowAssistantPermsModal(true)}
+          className="flex items-center gap-1 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 px-3 py-2 text-xs font-bold transition shrink-0 mr-2"
+        >
+          <Settings className="w-3.5 h-3.5" />
+          <span>تخصيص</span>
+        </button>
+      </div>
+
       {/* Stats Cards: Students, Homework, Today's Attendance */}
       <div className="grid grid-cols-2 gap-3">
         <div className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-2xs">
@@ -288,7 +355,9 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             <BookOpen className="w-4 h-4 text-blue-600" />
           </div>
           <div className="text-2xl font-black text-slate-900">{activeHomework.length}</div>
-          <div className="text-[11px] text-slate-400 mt-0.5">مستمرة للتسليم</div>
+          <div className="text-[11px] text-slate-400 mt-0.5">
+            {pendingHwGrading.length > 0 ? `${pendingHwGrading.length} تسليم بانتظار التصحيح` : 'مستمرة للتسليم'}
+          </div>
         </div>
       </div>
 
@@ -362,6 +431,136 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
           );
         })}
       </div>
+
+      {/* Assistant Permissions Modal */}
+      {showAssistantPermsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-3xl bg-white p-5 shadow-2xl text-slate-800 space-y-4 max-h-[85vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-teal-50 text-teal-800">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-slate-900">تخصيص صلاحيات المساعدين والسكرتارية</h3>
+                  <p className="text-[11px] text-slate-500">تحكم في المهام المسموحة لكل مساعد في مجموعاتك</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAssistantPermsModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 text-sm font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            {permSaveBanner && (
+              <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-2.5 text-xs font-bold text-emerald-800 flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>{permSaveBanner}</span>
+              </div>
+            )}
+
+            {assistants.length === 0 ? (
+              <div className="text-center py-6 text-xs text-slate-400">
+                لا يوجد حسابات مساعدين مسجلة حالياً
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {assistants.map((assistant) => {
+                  const perms = storage.getEffectiveAssistantPermissions(assistant.id, teacherId);
+                  const permRows: Array<{
+                    key: 'canRecordAttendance' | 'canSearchStudents' | 'canManagePayments' | 'canManageJoinRequests' | 'canManageHomework';
+                    label: string;
+                    desc: string;
+                  }> = [
+                    {
+                      key: 'canRecordAttendance',
+                      label: 'تسجيل الحضور والغياب ومسح QR',
+                      desc: 'مفعل افتراضياً لتسجيل حضور الطلاب السريع',
+                    },
+                    {
+                      key: 'canSearchStudents',
+                      label: 'البحث عن الطلاب وعرض الكارنيهات',
+                      desc: 'مفعل افتراضياً للبحث واستخراج الكارنيه الذكي',
+                    },
+                    {
+                      key: 'canManagePayments',
+                      label: 'تحصيل المصروفات وإصدار الإيصالات',
+                      desc: 'السماح للمساعد بتسجيل سداد الاشتراكات الشهرية',
+                    },
+                    {
+                      key: 'canManageJoinRequests',
+                      label: 'مراجعة وقبول طلبات انضمام الطلاب',
+                      desc: 'السماح بقبول أو رفض طلبات الانضمام للمجموعات',
+                    },
+                    {
+                      key: 'canManageHomework',
+                      label: 'متابعة تسليمات الواجبات',
+                      desc: 'السماح بمتابعة حالة تسليم الطلاب للواجبات',
+                    },
+                  ];
+
+                  return (
+                    <div
+                      key={assistant.id}
+                      className="rounded-2xl border border-slate-200 bg-slate-50/60 p-3.5 space-y-2.5"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="font-bold text-xs text-slate-900">{assistant.name}</div>
+                          <div className="text-[10px] text-slate-500">{assistant.email}</div>
+                        </div>
+                        <span className="text-[10px] font-bold bg-teal-50 text-teal-800 border border-teal-200 px-2 py-0.5 rounded-full">
+                          مساعد المدرس
+                        </span>
+                      </div>
+
+                      <div className="space-y-1.5 pt-1 border-t border-slate-200/70">
+                        {permRows.map((row) => {
+                          const enabled = perms[row.key];
+                          return (
+                            <div
+                              key={row.key}
+                              onClick={() => handleToggleAssistantPerm(assistant.id, row.key)}
+                              className="flex items-center justify-between rounded-xl bg-white p-2.5 border border-slate-200 cursor-pointer hover:border-teal-300 transition"
+                            >
+                              <div className="min-w-0 flex-1 ml-2">
+                                <div className="font-bold text-xs text-slate-800">{row.label}</div>
+                                <div className="text-[10px] text-slate-400">{row.desc}</div>
+                              </div>
+                              <button
+                                type="button"
+                                className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition shrink-0 ${
+                                  enabled
+                                    ? 'bg-emerald-600 text-white'
+                                    : 'bg-slate-200 text-slate-600'
+                                }`}
+                              >
+                                {enabled ? 'مفعل ✓' : 'مغلق'}
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setShowAssistantPermsModal(false)}
+              className="w-full rounded-xl bg-teal-700 hover:bg-teal-800 py-2.5 text-xs font-bold text-white transition"
+            >
+              تم الحفظ وإغلاق النافذة
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
+

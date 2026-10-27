@@ -21,7 +21,9 @@ import type {
   PracticeQuiz,
   QuizSubmission,
   StudentCertificate,
-  LiveSession
+  LiveSession,
+  HomeworkSubmission,
+  AssistantPermissions
 } from '../types/index.ts';
 
 export const INITIAL_USERS: User[] = [
@@ -167,7 +169,7 @@ export const INITIAL_GROUPS: Group[] = [
     durationMinutes: 90,
     joinCode: 'YD-2027',
     status: 'active',
-    joinApprovalMode: 'requires_approval',
+    joinApprovalMode: 'auto',
     createdAt: '2026-09-06T15:00:00Z',
   },
 ];
@@ -500,6 +502,7 @@ export const INITIAL_HOMEWORK: Homework[] = [
     assignedDate: '2026-09-24',
     dueDate: '2026-09-27',
     status: 'new',
+    maxScore: 10,
     createdAt: '2026-09-24T16:00:00Z',
   },
   {
@@ -511,6 +514,7 @@ export const INITIAL_HOMEWORK: Homework[] = [
     assignedDate: '2026-09-22',
     dueDate: '2026-09-30',
     status: 'active',
+    maxScore: 10,
     createdAt: '2026-09-22T14:00:00Z',
   },
   {
@@ -522,6 +526,7 @@ export const INITIAL_HOMEWORK: Homework[] = [
     assignedDate: '2026-09-18',
     dueDate: '2026-09-22',
     status: 'closed',
+    maxScore: 10,
     createdAt: '2026-09-18T12:00:00Z',
   },
 ];
@@ -1109,3 +1114,51 @@ export const INITIAL_LIVE_SESSIONS: LiveSession[] = [
     notes: 'تم شرح درس المعادلات الخطية وحل مسائل المستويات العليا وتوضيح الرسم البياني على السبورة.',
   },
 ];
+
+export const INITIAL_HOMEWORK_SUBMISSIONS: HomeworkSubmission[] = [
+  {
+    submissionId: 'hwsub_hw_2_user_student_1',
+    homeworkId: 'hw_2',
+    groupId: 'group_math_1',
+    groupName: 'رياضيات — أولى ثانوي',
+    studentId: 'user_student_1',
+    studentName: 'محمد أحمد',
+    answerText: 'تم حل جميع المسائل من ١ إلى ١٥ في شيت الهندسة، ومرفق خطوات البرهان لنظرية تاليس والتناسب في الدائرة.',
+    status: 'graded',
+    submittedAt: '2026-09-24T18:30:00Z',
+    score: 9.5,
+    maxScore: 10,
+    teacherFeedback: 'ممتاز يا محمد! خطوات البرهان منظمة جداً، انتبه فقط لتحويل الوحدات في المسألة رقم ١٤.',
+    gradedAt: '2026-09-24T20:15:00Z',
+    gradedBy: 'أستاذ أحمد حسن',
+  },
+  {
+    submissionId: 'hwsub_hw_2_user_student_youssef',
+    homeworkId: 'hw_2',
+    groupId: 'group_math_1',
+    groupName: 'رياضيات — أولى ثانوي',
+    studentId: 'user_student_youssef',
+    studentName: 'يوسف حمدي',
+    answerText: 'قمت بحل المسائل ١-١٥ كاملة في كشكول الواجب مع مراجعة قوانين قوة النقطة بالنسبة للدائرة.',
+    status: 'submitted',
+    submittedAt: '2026-09-25T15:00:00Z',
+  },
+];
+
+export const INITIAL_ASSISTANT_PERMISSIONS: AssistantPermissions[] = [
+  {
+    permissionId: 'user_teacher_1_user_assistant_1',
+    teacherId: 'user_teacher_1',
+    assistantId: 'user_assistant_1',
+    assistantName: 'أ/ سارة إبراهيم (مساعد وسكرتارية)',
+    assistantEmail: 'assistant@yalladars.com',
+    allowedGroupIds: ['group_math_1', 'group_math_2'],
+    canRecordAttendance: true,
+    canSearchStudents: true,
+    canManagePayments: false,
+    canManageJoinRequests: false,
+    canManageHomework: false,
+    updatedAt: '2026-09-05T09:00:00Z',
+  },
+];
+
