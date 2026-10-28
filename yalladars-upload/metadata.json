@@ -1,6 +1,0 @@
-{
-  "name": "يلا درس - YallaDars",
-  "description": "تطبيق إدارة ومتابعة الدروس الخصوصية للمدرس والطالب وولي الأمر - مجاني بالكامل وبدون تكاليف",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
