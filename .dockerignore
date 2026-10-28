@@ -1,0 +1,12 @@
+node_modules
+dist
+.git
+.gitignore
+.env
+.env.local
+.local_jwt_secret
+*.log
+*.tmp
+android/
+yalladars-upload/
+.aistudio/

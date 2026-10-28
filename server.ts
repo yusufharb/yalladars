@@ -31,6 +31,7 @@ import {
   INITIAL_HOMEWORK_SUBMISSIONS,
   INITIAL_ASSISTANT_PERMISSIONS,
 } from './src/data/mockInitialData.ts';
+import { supabaseService } from './src/server/supabaseService.ts';
 
 const PORT = Number(process.env.PORT) || 3000;
 const DB_FILE_PATH = path.resolve(process.cwd(), 'data', 'yalladars_cloud_db.json');
@@ -375,6 +376,12 @@ function saveDatabase() {
     }
 
     fs.renameSync(DB_TMP_PATH, DB_FILE_PATH);
+
+    if (supabaseService.isAvailable()) {
+      supabaseService.seedInitialData(database).catch((e) => {
+        console.warn('⚠️ [Supabase] Snapshot save warning:', e?.message || e);
+      });
+    }
   } catch (err) {
     console.error('Failed to save cloud database atomically:', err);
   } finally {
@@ -483,7 +490,34 @@ function ensureStudentProfilesIntegrity(): boolean {
   return changed;
 }
 
-function loadDatabase() {
+async function loadDatabase() {
+  if (supabaseService.isAvailable()) {
+    try {
+      const remoteState = await supabaseService.loadAllState();
+      if (remoteState && remoteState.collections && Object.keys(remoteState.collections).length > 0) {
+        const defaultSeed = buildSeededDefaultDb();
+        database = {
+          ...defaultSeed,
+          ...remoteState.collections,
+          tombstones: Array.isArray(remoteState.tombstones) ? remoteState.tombstones : [],
+          lastUpdated: remoteState.lastUpdated || Date.now(),
+        } as any;
+        ensureStudentProfilesIntegrity();
+        console.log('✅ [Supabase] Database loaded from Supabase PostgreSQL successfully.');
+        return;
+      } else {
+        console.log('ℹ️ [Supabase] Remote database is empty. Seeding initial data to Supabase...');
+        database = buildSeededDefaultDb();
+        ensureStudentProfilesIntegrity();
+        await supabaseService.seedInitialData(database);
+        saveDatabase();
+        return;
+      }
+    } catch (err: any) {
+      console.warn('⚠️ [Supabase] Failed to load state from Supabase, falling back to local file:', err?.message || err);
+    }
+  }
+
   const tryParseFile = (filePath: string): any | null => {
     if (!fs.existsSync(filePath)) return null;
     try {
@@ -561,8 +595,6 @@ function loadDatabase() {
     saveDatabase();
   }
 }
-
-loadDatabase();
 
 // ============================================================================
 // 4. Authentication & Active Session Verification Helper
@@ -1344,6 +1376,7 @@ function checkLinkingRateLimit(key: string): boolean {
 // ============================================================================
 
 async function startServer() {
+  await loadDatabase();
   const app = express();
 
   app.use((req, res, next) => {
@@ -2221,6 +2254,12 @@ async function startServer() {
       database.syncLog = database.syncLog.slice(0, 100);
       ensureStudentProfilesIntegrity();
       saveDatabase();
+
+      if (supabaseService.isAvailable()) {
+        supabaseService.persistChanges(changes, tombstones).catch((e) => {
+          console.warn('⚠️ [Supabase] Incremental sync persist warning:', e?.message || e);
+        });
+      }
     }
 
     res.json({
