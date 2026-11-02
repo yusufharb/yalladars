@@ -50,6 +50,9 @@ class SupabaseService {
   }
 
   public isAvailable(): boolean {
+    if (!this.isConfigured || !this.client) {
+      this.init();
+    }
     return this.isConfigured && this.client !== null;
   }
 

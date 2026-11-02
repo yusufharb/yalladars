@@ -1401,13 +1401,38 @@ export async function createApp(): Promise<express.Application> {
   });
   app.use(express.json({ limit: '10mb' }));
 
-  app.get('/api/health', (_req, res) => {
+  app.get('/api/health', async (_req, res) => {
+    const supabaseAvailable = supabaseService.isAvailable();
+    let supabaseStatus = supabaseAvailable ? 'connected' : 'not_configured';
+    let recordsCount = 0;
+
+    if (supabaseAvailable) {
+      try {
+        const state = await supabaseService.loadAllState();
+        if (state) {
+          recordsCount = Object.values(state.collections).reduce(
+            (acc, col) => acc + (Array.isArray(col) ? col.length : 0),
+            0
+          );
+          supabaseStatus = 'healthy_and_ready';
+        } else {
+          supabaseStatus = 'tables_not_created_yet_please_run_supabase_schema_sql';
+        }
+      } catch (err: any) {
+        supabaseStatus = `error: ${err?.message || 'unknown'}`;
+      }
+    }
+
     res.json({
       status: 'ok',
       app: 'YallaDars - يلا درس',
+      supabase: {
+        status: supabaseStatus,
+        configured: supabaseAvailable,
+        totalRecordsInSupabase: recordsCount,
+      },
       serverTime: new Date().toISOString(),
       timestamp: Date.now(),
-      billing: '100% Free & Self-Hosted',
     });
   });
 
