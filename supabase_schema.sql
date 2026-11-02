@@ -362,12 +362,29 @@ ALTER TABLE public.grades ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tuition_payments ENABLE ROW LEVEL SECURITY;
 
 -- Allow Service Role full access to all tables (for backend server)
+DROP POLICY IF EXISTS "Service role full access on yd_sync_records" ON public.yd_sync_records;
 CREATE POLICY "Service role full access on yd_sync_records" ON public.yd_sync_records FOR ALL USING (true);
+
+DROP POLICY IF EXISTS "Service role full access on users" ON public.users;
 CREATE POLICY "Service role full access on users" ON public.users FOR ALL USING (true);
+
+DROP POLICY IF EXISTS "Service role full access on groups" ON public.groups;
 CREATE POLICY "Service role full access on groups" ON public.groups FOR ALL USING (true);
+
+DROP POLICY IF EXISTS "Service role full access on group_members" ON public.group_members;
 CREATE POLICY "Service role full access on group_members" ON public.group_members FOR ALL USING (true);
+
+DROP POLICY IF EXISTS "Service role full access on attendance" ON public.attendance;
 CREATE POLICY "Service role full access on attendance" ON public.attendance FOR ALL USING (true);
+
+DROP POLICY IF EXISTS "Service role full access on homework" ON public.homework;
 CREATE POLICY "Service role full access on homework" ON public.homework FOR ALL USING (true);
+
+DROP POLICY IF EXISTS "Service role full access on homework_submissions" ON public.homework_submissions;
 CREATE POLICY "Service role full access on homework_submissions" ON public.homework_submissions FOR ALL USING (true);
+
+DROP POLICY IF EXISTS "Service role full access on grades" ON public.grades;
 CREATE POLICY "Service role full access on grades" ON public.grades FOR ALL USING (true);
+
+DROP POLICY IF EXISTS "Service role full access on tuition_payments" ON public.tuition_payments;
 CREATE POLICY "Service role full access on tuition_payments" ON public.tuition_payments FOR ALL USING (true);
