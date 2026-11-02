@@ -1,6 +1,7 @@
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import crypto from 'crypto';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
@@ -34,14 +35,24 @@ import {
 import { supabaseService } from './src/server/supabaseService.ts';
 
 const PORT = Number(process.env.PORT) || 3000;
-const DB_FILE_PATH = path.resolve(process.cwd(), 'data', 'yalladars_cloud_db.json');
-const DB_TMP_PATH = path.resolve(process.cwd(), 'data', 'yalladars_cloud_db.json.tmp');
-const DB_BAK_PATH = path.resolve(process.cwd(), 'data', 'yalladars_cloud_db.json.bak');
-const LOCAL_DEV_SECRET_FILE = path.resolve(process.cwd(), '.local_jwt_secret');
+const isVercel = Boolean(process.env.VERCEL);
+const baseDataDir = isVercel
+  ? path.resolve(os.tmpdir(), 'yalladars_data')
+  : path.resolve(process.cwd(), 'data');
 
-const dataDir = path.dirname(DB_FILE_PATH);
-if (!fs.existsSync(dataDir)) {
-  fs.mkdirSync(dataDir, { recursive: true });
+const DB_FILE_PATH = path.resolve(baseDataDir, 'yalladars_cloud_db.json');
+const DB_TMP_PATH = path.resolve(baseDataDir, 'yalladars_cloud_db.json.tmp');
+const DB_BAK_PATH = path.resolve(baseDataDir, 'yalladars_cloud_db.json.bak');
+const LOCAL_DEV_SECRET_FILE = isVercel
+  ? path.resolve(os.tmpdir(), '.local_jwt_secret')
+  : path.resolve(process.cwd(), '.local_jwt_secret');
+
+if (!fs.existsSync(baseDataDir)) {
+  try {
+    fs.mkdirSync(baseDataDir, { recursive: true });
+  } catch (err) {
+    console.warn('Could not create data dir:', err);
+  }
 }
 
 // ============================================================================
@@ -1375,7 +1386,7 @@ function checkLinkingRateLimit(key: string): boolean {
 // 8. Express Server & Routes
 // ============================================================================
 
-async function startServer() {
+export async function createApp(): Promise<express.Application> {
   await loadDatabase();
   const app = express();
 
@@ -2317,6 +2328,19 @@ async function startServer() {
     });
   });
 
+  return app;
+}
+
+let appInstance: express.Application | null = null;
+export async function getApp(): Promise<express.Application> {
+  if (!appInstance) {
+    appInstance = await createApp();
+  }
+  return appInstance;
+}
+
+export async function startServer() {
+  const app = await getApp();
   const distPath = path.join(process.cwd(), 'dist');
   const distIndex = path.join(distPath, 'index.html');
 
@@ -2338,6 +2362,9 @@ async function startServer() {
   });
 }
 
-startServer().catch((err) => {
-  console.error('Server startup error:', err);
-});
+// Only auto-start server when run directly (not in Vercel Serverless environment)
+if (!process.env.VERCEL) {
+  startServer().catch((err) => {
+    console.error('Server startup error:', err);
+  });
+}
